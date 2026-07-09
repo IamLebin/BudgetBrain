@@ -1,0 +1,58 @@
+[
+  {
+    "task_id": "math-1",
+    "category": "math",
+    "prompt": "What is the product of 14 and 6?",
+    "expected": "84",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "sentiment-1",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment as positive, negative, or neutral: \"The app is reliable, useful, and smooth.\"",
+    "expected": "positive",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "ner-1",
+    "category": "ner",
+    "prompt": "Extract named entities from: \"Maya Lee visited Google Labs in Paris on July 8, 2026.\"",
+    "contains": ["Maya Lee", "Google Labs", "Paris", "July 8, 2026"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "code-debug-1",
+    "category": "code_debugging",
+    "prompt": "Find the syntax issue in this Python code:\n```python\ndef add(a, b)\n    return a + b\n```",
+    "contains": ["Syntax error"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "factual-1",
+    "category": "factual_qa",
+    "prompt": "What is the capital city of Japan?",
+    "expected": "Tokyo",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "summary-1",
+    "category": "summarization",
+    "prompt": "Summarize in one sentence: Budget tracking helps people understand income, spending, savings, and recurring obligations. A good system highlights patterns and makes tradeoffs easier to see.",
+    "expected": "Budget tracking helps people understand spending patterns and make clearer financial tradeoffs.",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "logic-1",
+    "category": "logic",
+    "prompt": "Logic puzzle: exactly one statement is true. Alice says \"Bob is lying\". Bob says \"Alice is lying\". Who is telling the truth?",
+    "expected": "Alice",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "code-gen-1",
+    "category": "code_generation",
+    "prompt": "Write a Python function called square that returns n multiplied by itself.",
+    "contains": ["def square", "return"],
+    "requires_fireworks": true
+  }
+]
