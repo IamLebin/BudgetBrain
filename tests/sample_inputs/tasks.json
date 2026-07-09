@@ -1,0 +1,14 @@
+[
+  {
+    "task_id": "math-1",
+    "prompt": "Calculate (12 + 8) * 3."
+  },
+  {
+    "task_id": "sentiment-1",
+    "prompt": "Classify the sentiment: \"The setup was smooth and the result is excellent.\""
+  },
+  {
+    "task_id": "ner-1",
+    "prompt": "Extract named entities from: \"Lisa Wong met OpenAI in Paris on July 8, 2026.\""
+  }
+]
