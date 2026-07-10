@@ -1,0 +1,62 @@
+[
+  {
+    "task_id": "practice-01",
+    "category": "factual_qa",
+    "prompt": "What is the capital of Australia, and what body of water is it near?",
+    "contains": ["Canberra"],
+    "contains_any": ["Lake Burley Griffin", "Molonglo River"],
+    "fake_answer": "Canberra, near Lake Burley Griffin.",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "practice-02",
+    "category": "math",
+    "prompt": "A store has 240 items. It sells 15% on Monday and 60 more on Tuesday. How many items remain?",
+    "expected": "144",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "practice-03",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment of this review: The battery life is great, but the screen scratches too easily.",
+    "expected": "mixed",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "practice-04",
+    "category": "summarization",
+    "prompt": "Summarize the following in exactly one sentence: The city replaced old diesel buses with electric models, installed depot chargers, and trained drivers to use regenerative braking. Officials expect the program to lower fuel costs, reduce noise, and cut transport emissions.",
+    "contains": ["city", "electric", "bus", "emissions"],
+    "fake_answer": "The city's electric bus program is expected to reduce costs, noise, and transport emissions.",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "practice-05",
+    "category": "ner",
+    "prompt": "Extract all named entities and their types from: Maria Sanchez joined Fireworks AI in Berlin last March.",
+    "contains": ["Maria Sanchez", "PERSON", "Fireworks AI", "ORG", "Berlin", "LOCATION", "last March", "DATE"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "practice-06",
+    "category": "code_debugging",
+    "prompt": "This function should return the max of a list but has a bug: def get_max(nums): return nums[0]. Find and fix it.",
+    "contains": ["def get_max", "return max(nums)"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "practice-07",
+    "category": "logic",
+    "prompt": "Three friends, Sam, Jo, and Lee, each own a different pet: cat, dog, bird. Sam does not own the bird. Jo owns the dog. Who owns the cat?",
+    "expected": "Sam",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "practice-08",
+    "category": "code_generation",
+    "prompt": "Write a Python function that returns the second-largest number in a list, handling duplicates correctly.",
+    "contains": ["def", "set", "return"],
+    "fake_answer": "def second_largest(nums):\n    values = sorted(set(nums), reverse=True)\n    return values[1]",
+    "requires_fireworks": true
+  }
+]

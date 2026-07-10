@@ -1,74 +1,83 @@
 # TASKS.md — Execution Checklist
 
-Ordered so an agent (or teammate) can pick this up and work top-down. Don't skip step 0 —
-everything downstream depends on it being accurate.
+Current after the latest Discord/guide clarification.
 
-## 0. Confirm the contract (do this before writing code)
-- [x] Open the official Participant Guide and FAQ doc
-- [x] Fill in the "Open items to confirm" checklist in `PROJECT.md`
-- [x] Update the I/O contract placeholder in `ARCHITECTURE.md` with the real schema
-- [x] Confirm Fireworks API base URL + auth method + env var names
-- [ ] Confirm the accuracy gate threshold if published
+## 0. Confirm the Contract
+- [x] Participant Guide / Discord contract captured
+- [x] Input: read `/input/tasks.json`
+- [x] Output: write `/output/results.json`
+- [x] Input shape: `[{"task_id": "...", "prompt": "..."}]`
+- [x] Output shape: `[{"task_id": "...", "answer": "..."}]`
+- [x] Category is not provided and must be inferred
+- [x] Env vars: `FIREWORKS_API_KEY`, `FIREWORKS_BASE_URL`, `ALLOWED_MODELS`
+- [x] Accuracy gate is `80%`
+- [x] Real eval has `19` tasks, so target is at least `16/19`
+- [x] Grading environment: `4 GB RAM`, `2 vCPU`
 
-## 1. Scaffold the repo
-- [x] Create directory layout from `ARCHITECTURE.md`
-- [x] `requirements.txt`: currently empty because the runner uses only the Python standard
-      library plus Fireworks' OpenAI-compatible HTTP endpoint via `urllib`
-- [x] Get a minimal batch entry point running locally
+## 1. Scaffold and Runtime
+- [x] Batch runner entrypoint in `app/main.py`
+- [x] Router in `router/classify.py`
+- [x] Fireworks client in `fireworks/client.py`
+- [x] Local solvers in `solvers/`
+- [x] No third-party runtime dependencies
 
-## 2. Build local solvers first (these are your free wins)
-- [x] Math solver + unit tests with several unseen-style examples
-- [x] NER solver regex baseline + unit tests
-- [x] Sentiment solver + unit tests
-- [ ] Logic puzzle solver broader constraint-based subset + unit tests
-- [ ] For each: measure accuracy against a larger hand-built test set; only mark "local-solvable"
-      in `DESIGN.md` once accuracy looks solid
+## 2. Local Solvers
+- [x] Arithmetic/percentage/word-arithmetic math baseline
+- [x] Regex NER baseline
+- [x] Lexicon sentiment baseline
+- [x] Python syntax-error debugging baseline
+- [x] Tiny logic baseline
+- [x] Broaden math word-problem coverage with safety gates for multi-step prompts
+- [x] Broaden NER entity/date handling and confidence fallback
+- [x] Broaden logic puzzle coverage with one-to-one assignments
+- [x] Broaden code-debugging to return corrected implementations for safe local repairs
 
-## 3. Build the router
-- [x] Category classifier (category is not given in input)
-- [x] Solvability gate: local solver if confident + accurate, else escalate
-- [x] Log every decision (category, chosen path, tokens if any) for debugging
+## 3. Fireworks Client
+- [x] Per-category model preferences
+- [x] Per-category short system prompts
+- [x] Per-category `max_tokens`
+- [x] Token usage logging
+- [x] Retry next allowed model if a selected model is unavailable
+- [x] Avoid relying on Gemma first by default because Gemma is on-demand
+- [x] Normalize shorthand model names to full Fireworks model IDs
+- [x] Run live Fireworks eval with real credentials
+- [x] Tune model choices and reasoning effort using official, held-out, and stress live runs
+- [x] Enforce 25-second request timeout and retry only permitted runtime models
+- [x] Normalize final math, sentiment, logic, and code output formats
 
-## 4. Build the Fireworks client
-- [x] Wrapper function with model name, prompt, max_tokens as parameters
-- [x] Per-category prompt templates (start from `DESIGN.md` notes)
-- [x] Token usage logging on every call
-- [ ] Test with a real Fireworks key against factual Q&A, summarization, code debugging,
-      code generation categories
-      - Blocked locally: `FIREWORKS_API_KEY` is not set in this shell
+## 4. Evaluation
+- [x] Unit tests pass
+- [x] Offline all-category fixture passes: `8/8`
+- [x] Harness prints the real Track 1 gate: `16/19`
+- [x] Live Fireworks fixture passes: `8/8`
+- [x] Track live token usage per category
+- [x] Import all 8 official practice tasks from the updated guide
+- [x] Add 16 held-out variants and 8 reasoning stress tasks
+- [x] Final live official Docker run passes `8/8` with `446` Fireworks tokens
+- [x] Final live reasoning stress run passes `8/8` with `1,497` Fireworks tokens
 
-## 5. Wire it together end-to-end
-- [x] Full pipeline: input → classify → local or Fireworks → output in required format
-- [x] Run all 8 categories through offline fixture with fake Fireworks fallback
-- [ ] Run all 8 categories through it with real Fireworks credentials
-- [ ] Fix any category that silently fails or times out
+## 5. Docker
+- [x] Dockerfile builds as `linux/amd64`
+- [x] Image is far under `10GB`
+- [x] Container reads `/input/tasks.json` and writes `/output/results.json`
+- [x] Final image `budgetbrain-track1:champion` is `linux/amd64`, `45,522,179` bytes
+- [x] Push immutable image to public Docker Hub registry
+- [x] Confirm anonymous `linux/amd64` manifest access and pull work
 
-## 6. Local evaluation harness
-- [x] `eval/run_local_eval.py`: runs a small smoke batch through the real entrypoint
-- [x] Expand harness to report all-category pass/fail with offline fake Fireworks fallback
-- [x] Confirm the expanded harness catches wrong answers
-- [ ] Add real Fireworks token totals after live credentialed test
-- [ ] Re-run after any prompt/model change — track results over time in `DESIGN.md`
+## 6. Pre-Submission
+- [x] No API keys baked into image
+- [x] No exact-answer cache tables for real eval
+- [x] README run instructions match the file contract
+- [x] Set Fireworks env vars in local `.env`
+- [x] Runtime consumes organizer-injected Fireworks env vars without baking secrets into image
+- [ ] Submit image and watch for guide failure statuses:
+  `PULL_ERROR`, `RUNTIME_ERROR`, `TIMEOUT`, `INVALID_RESULTS_SCHEMA`, `MODEL_VIOLATION`,
+  `IMAGE_TOO_LARGE`, `ACCURACY_GATE_FAILED`
+- [ ] Use registry download counter to confirm evaluator pulled the image
 
-## 7. Docker packaging
-- [x] Write `Dockerfile` targeting `linux/amd64`
-- [x] Build: `docker buildx build --platform linux/amd64 -t budgetbrain-track1:local --load .`
-- [x] Confirm image size is comfortably under 10GB
-      - Current local image: about `187MB`
-      - Docker inspect: `linux/amd64`
-- [x] Run the container locally and hit it the same way the evaluator will
-- [ ] Push to a public registry (Docker Hub / GHCR) and confirm anonymous `docker pull` works
-      from a clean machine/account
-
-## 8. Pre-submission checklist
-- [ ] No hardcoded answers anywhere — grep for suspicious lookup tables or literal test inputs
-- [ ] Env vars (API keys) are not baked into the image
-- [x] README explains how to run it, matching the actual entry point
-- [ ] One final full local eval run passes the accuracy gate with a comfortable margin
-      - Offline fixture passes; real Fireworks eval still pending
-- [ ] Submit — remember submissions are rate-limited, so don't submit until you're confident
-
-## 9. Stretch (if time remains)
-- [ ] Try a Gemma model on categories where accuracy is close, for the Gemma bonus prize
-- [ ] Try to push more categories from "Fireworks-required" to "local-solvable"
-- [ ] Tighten prompts further to shave tokens without losing accuracy
+## 7. Publication
+- [x] Public release explicitly approved and pushed as
+  `lebinbin/budgetbrain-track1:amd-act2-20260710`
+- [x] Public repository and anonymous pull verified
+- [x] Published digest recorded as
+  `sha256:bb74ac8bf2d2c089a236f578ef82e10e0a9316430fc8f2293bf23468badfedc6`

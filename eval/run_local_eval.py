@@ -12,6 +12,10 @@ from app.main import run_batch
 from router.classify import classify_prompt
 
 
+TRACK1_TOTAL_TASKS = 19
+ACCURACY_GATE = 0.80
+MIN_CORRECT_TO_PASS = 16
+
 SAMPLE_TASKS = [
     {"task_id": "math-1", "prompt": "Calculate (12 + 8) * 3."},
     {"task_id": "sentiment-1", "prompt": 'Classify the sentiment: "The setup was smooth and the result is excellent."'},
@@ -22,7 +26,10 @@ SAMPLE_TASKS = [
 class FakeFireworksClient:
     ANSWERS = {
         "factual_qa": "Tokyo",
-        "summarization": "Budget tracking helps people understand spending patterns and make clearer financial tradeoffs.",
+        "summarization": (
+            "Budget tracking helps people understand spending patterns and make clearer "
+            "financial tradeoffs."
+        ),
         "logic": "Alice",
         "code_generation": "def square(n):\n    return n * n",
         "code_debugging": "Fix the syntax or logic error in the code.",
@@ -31,12 +38,13 @@ class FakeFireworksClient:
         "ner": "[]",
     }
 
-    def __init__(self) -> None:
+    def __init__(self, responses: dict[str, str] | None = None) -> None:
         self.calls: list[dict[str, str]] = []
+        self.responses = responses or {}
 
     def solve(self, prompt: str, category: str) -> str:
         self.calls.append({"category": category, "prompt": prompt})
-        return self.ANSWERS.get(category, "")
+        return self.responses.get(prompt, self.ANSWERS.get(category, ""))
 
 
 def main() -> int:
@@ -73,7 +81,12 @@ def run_fixture_eval(path: Path, fake_fireworks: bool = False) -> int:
     if not isinstance(fixture, list):
         raise ValueError("fixture must be a JSON array")
 
-    fake_client = FakeFireworksClient() if fake_fireworks else None
+    fake_responses = {
+        str(item["prompt"]): str(item["fake_answer"])
+        for item in fixture
+        if "fake_answer" in item
+    }
+    fake_client = FakeFireworksClient(fake_responses) if fake_fireworks else None
     rows: list[dict[str, Any]] = []
     correct = 0
 
@@ -102,11 +115,15 @@ def run_fixture_eval(path: Path, fake_fireworks: bool = False) -> int:
     for row in rows:
         status = "PASS" if row["passed"] else "FAIL"
         print(
-            f"{status} {row['task_id']} category={row['actual_category']} source={row['source']} answer={row['answer']!r}"
+            f"{status} {row['task_id']} category={row['actual_category']} "
+            f"source={row['source']} answer={row['answer']!r}"
         )
     total = len(rows)
     calls = len(fake_client.calls) if fake_client else "real/env"
     print(f"score={correct}/{total} fake_fireworks_calls={calls}")
+    print(
+        f"track1_gate={ACCURACY_GATE:.0%} real_eval_requires_at_least={MIN_CORRECT_TO_PASS}/{TRACK1_TOTAL_TASKS}"
+    )
     return 0 if correct == total else 1
 
 
@@ -116,7 +133,12 @@ def _answer_matches(answer: str, item: dict[str, Any]) -> bool:
     contains = item.get("contains")
     if isinstance(contains, list):
         lowered = answer.lower()
-        return all(str(part).lower() in lowered for part in contains)
+        if not all(str(part).lower() in lowered for part in contains):
+            return False
+        contains_any = item.get("contains_any")
+        if isinstance(contains_any, list):
+            return any(str(part).lower() in lowered for part in contains_any)
+        return True
     return bool(answer.strip())
 
 

@@ -8,17 +8,108 @@ from solvers.common import LocalAnswer
 
 ORG_SUFFIXES = {
     "AI",
+    "Agency",
+    "Association",
+    "Bank",
+    "Center",
+    "Centre",
+    "College",
+    "Company",
     "Corp",
     "Corporation",
+    "Council",
+    "Department",
     "Foundation",
+    "Group",
+    "Hospital",
     "Inc",
     "Institute",
     "Labs",
     "Ltd",
+    "Ministry",
+    "Museum",
+    "Organization",
+    "School",
+    "Systems",
+    "Technologies",
+    "Times",
     "University",
 }
 
-LOCATION_PREPOSITIONS = {"at", "from", "in", "near", "to"}
+GEOGRAPHIC_NAMES = {
+    "Buenos Aires",
+    "Cape Town",
+    "Costa Rica",
+    "Hong Kong",
+    "Kuala Lumpur",
+    "Los Angeles",
+    "New York",
+    "New Zealand",
+    "North Korea",
+    "Rio de Janeiro",
+    "San Francisco",
+    "Saudi Arabia",
+    "South Korea",
+    "United Kingdom",
+    "United States",
+}
+
+LOCATION_SUFFIXES = {
+    "Airport",
+    "Bay",
+    "Beach",
+    "City",
+    "County",
+    "Island",
+    "Lake",
+    "Mountain",
+    "Province",
+    "River",
+    "State",
+    "Street",
+    "Valley",
+}
+
+PERSON_TITLES = {
+    "Dr",
+    "Mr",
+    "Mrs",
+    "Ms",
+    "President",
+    "Professor",
+    "Prof",
+    "Senator",
+}
+
+WEEKDAYS = {
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+}
+
+DATE_RELATIVES = {
+    "last",
+    "next",
+    "this",
+}
+
+LOCATION_PREPOSITIONS = {
+    "across",
+    "at",
+    "from",
+    "in",
+    "inside",
+    "near",
+    "outside",
+    "to",
+    "toward",
+    "towards",
+}
+
 MONTHS = {
     "Jan",
     "January",
@@ -46,15 +137,27 @@ MONTHS = {
     "December",
 }
 
+SKIP_CAPITALIZED = {
+    "A",
+    "An",
+    "Extract",
+    "Find",
+    "I",
+    "Identify",
+    "Label",
+    "The",
+}
+
 
 def solve_ner(prompt: str) -> LocalAnswer | None:
     if not re.search(r"\b(extract|identify|find|named entities|entities)\b", prompt, re.I):
         return None
     text = _target_text(prompt)
-    entities = _extract_entities(text)
+    entities, unresolved = _extract_entities(text)
     if not entities:
         return None
-    return LocalAnswer(json.dumps(entities, ensure_ascii=False), 0.84, "regex_entities")
+    confidence = 0.78 if unresolved else 0.9
+    return LocalAnswer(json.dumps(entities, ensure_ascii=False), confidence, "regex_entities")
 
 
 def _target_text(prompt: str) -> str:
@@ -66,10 +169,11 @@ def _target_text(prompt: str) -> str:
     return parts[-1]
 
 
-def _extract_entities(text: str) -> list[dict[str, str]]:
+def _extract_entities(text: str) -> tuple[list[dict[str, str]], bool]:
     entities: list[dict[str, str]] = []
     seen: set[tuple[str, str]] = set()
     spans: list[tuple[int, int]] = []
+    unresolved = False
 
     for match in re.finditer(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b", text):
         _add(entities, seen, spans, match.group(0), "EMAIL", match.span())
@@ -79,24 +183,67 @@ def _extract_entities(text: str) -> list[dict[str, str]]:
     for match in re.finditer(
         r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b",
         text,
+        flags=re.IGNORECASE,
+    ):
+        _add(entities, seen, spans, match.group(0), "DATE", match.span())
+    for match in re.finditer(
+        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?(?:\s+\d{1,2})?(?:,?\s+\d{4})\b",
+        text,
+        flags=re.IGNORECASE,
     ):
         _add(entities, seen, spans, match.group(0), "DATE", match.span())
     for match in re.finditer(r"\b\d{4}-\d{2}-\d{2}\b", text):
         _add(entities, seen, spans, match.group(0), "DATE", match.span())
+    date_words = "|".join(sorted(MONTHS | WEEKDAYS, key=len, reverse=True))
+    for match in re.finditer(
+        fr"\b(?:last|next|this)\s+(?:{date_words})\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        _add(entities, seen, spans, match.group(0), "DATE", match.span())
+    for match in re.finditer(r"\b(?:today|tomorrow|yesterday|tonight)\b", text, flags=re.I):
+        _add(entities, seen, spans, match.group(0), "DATE", match.span())
+    for match in re.finditer(
+        fr"\b(?:in|during|since|until|by|before|after)\s+({date_words})\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        if not _overlaps(match.span(1), spans):
+            _add(entities, seen, spans, match.group(1), "DATE", match.span(1))
 
-    name_pattern = r"\b(?:[A-Z][A-Za-z]*|[A-Z]{2,})(?:\s+(?:[A-Z][A-Za-z]*|[A-Z]{2,}))*\b"
+    title_words = "|".join(sorted(PERSON_TITLES, key=len, reverse=True))
+    for match in re.finditer(
+        fr"\b(?:{title_words})\.?\s+([A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)+)\b",
+        text,
+    ):
+        full_span = match.span()
+        _add(entities, seen, spans, match.group(1), "PERSON", full_span)
+
+    org_suffixes = "|".join(sorted(ORG_SUFFIXES, key=len, reverse=True))
+    for match in re.finditer(
+        fr"\b(?:[A-Z][A-Za-z&.'-]*\s+)*[A-Z][A-Za-z&.'-]*\s+(?:{org_suffixes})\b",
+        text,
+    ):
+        if not _overlaps(match.span(), spans):
+            _add(entities, seen, spans, match.group(0), "ORG", match.span())
+
+    name_pattern = (
+        r"\b(?:[A-Z][A-Za-z'-]*|[A-Z]{2,})"
+        r"(?:\s+(?:[A-Z][A-Za-z'-]*|[A-Z]{2,}))*\b"
+    )
     for match in re.finditer(name_pattern, text):
         if _overlaps(match.span(), spans):
             continue
         value = match.group(0)
         words = value.split()
-        if value in {"I", "The", "A", "An"} or words[0] in MONTHS:
+        if value in SKIP_CAPITALIZED or words[0] in MONTHS or words[0] in DATE_RELATIVES:
             continue
         label = _label_name(text, match.start(), value)
         if label is None:
+            unresolved = True
             continue
         _add(entities, seen, spans, value, label, match.span())
-    return entities
+    return entities, unresolved
 
 
 def _label_name(source: str, start: int, value: str) -> str | None:
@@ -105,8 +252,12 @@ def _label_name(source: str, start: int, value: str) -> str | None:
     previous_word = previous[-1].lower() if previous else ""
     if previous_word in LOCATION_PREPOSITIONS:
         return "LOCATION"
+    if value in GEOGRAPHIC_NAMES:
+        return "LOCATION"
     if words[-1] in ORG_SUFFIXES or value.isupper() or (len(words) == 1 and _has_internal_capital(value)):
         return "ORG"
+    if words[-1] in LOCATION_SUFFIXES:
+        return "LOCATION"
     if len(words) >= 2:
         return "PERSON"
     return None

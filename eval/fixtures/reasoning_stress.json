@@ -1,0 +1,66 @@
+[
+  {
+    "task_id": "math-sequential-percent",
+    "category": "math",
+    "prompt": "A price starts at 100, increases by 20%, then decreases by 10%. What is the final price?",
+    "expected": "108",
+    "fake_answer": "108",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "math-average-speed",
+    "category": "math",
+    "prompt": "A train travels 120 km at 60 km/h, then 180 km at 90 km/h. What is its average speed for the entire trip?",
+    "expected": "75 km/h",
+    "fake_answer": "75 km/h",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "math-ratio",
+    "category": "math",
+    "prompt": "Red and blue marbles are in a 3:5 ratio. If there are 64 marbles total, how many are blue?",
+    "expected": "40",
+    "fake_answer": "40",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "logic-ordering",
+    "category": "logic",
+    "prompt": "Logic puzzle: Ria, Sol, and Tom sit in one row. Ria sits left of Sol, and Tom sits right of Sol. What is their order from left to right?",
+    "contains": ["Ria", "Sol", "Tom"],
+    "fake_answer": "Ria, Sol, Tom",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "logic-conditional",
+    "category": "logic",
+    "prompt": "Logical deduction: If the server is offline, the alert is red. The alert is not red. Can the server be offline?",
+    "expected": "No",
+    "fake_answer": "No",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "debug-mutable-default",
+    "category": "code_debugging",
+    "prompt": "Find and fix the mutable-default bug in this Python function:\n```python\ndef add_item(item, bucket=[]):\n    bucket.append(item)\n    return bucket\n```",
+    "contains": ["bucket=None", "if bucket is None"],
+    "fake_answer": "def add_item(item, bucket=None):\n    if bucket is None:\n        bucket = []\n    bucket.append(item)\n    return bucket",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "code-merge-intervals",
+    "category": "code_generation",
+    "prompt": "Write a Python function merge_intervals(intervals) that merges all overlapping intervals and returns them sorted by start.",
+    "contains": ["def merge_intervals", "sort", "merged"],
+    "fake_answer": "def merge_intervals(intervals):\n    intervals = sorted(intervals)\n    merged = []\n    for start, end in intervals:\n        if not merged or start > merged[-1][1]:\n            merged.append([start, end])\n        else:\n            merged[-1][1] = max(merged[-1][1], end)\n    return merged",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "code-balanced",
+    "category": "code_generation",
+    "prompt": "Write a Python function is_balanced(s) that returns whether (), [], and {} brackets are correctly balanced.",
+    "contains": ["def is_balanced", "stack", "return"],
+    "fake_answer": "def is_balanced(s):\n    stack = []\n    pairs = {')': '(', ']': '[', '}': '{'}\n    for ch in s:\n        if ch in '([{':\n            stack.append(ch)\n        elif ch in pairs and (not stack or stack.pop() != pairs[ch]):\n            return False\n    return not stack",
+    "requires_fireworks": true
+  }
+]
