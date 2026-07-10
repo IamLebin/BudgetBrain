@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="BudgetBrain Track 1 — Token-efficient AI agent demo. AMD Developer Hackathon ACT II.">
+  <title>BudgetBrain Track 1 · Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080808;
+      --bg2:      #0f0f0f;
+      --bg3:      #151515;
+      --border:   #1c1c1c;
+      --border2:  #262626;
+      --red:      #ef4444;
+      --red-dim:  #ef444428;
+      --red-glow: #ef444466;
+      --green:    #22c55e;
+      --text:     #e5e7eb;
+      --muted:    #6b7280;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 1.5rem 4rem;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 2.8rem 0 1.6rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.6rem;
+    }
+
+    header h1 {
+      font-size: clamp(2.2rem, 7vw, 3.6rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    .white { color: #fff; }
+    .red {
+      color: var(--red);
+      text-shadow: 0 0 40px var(--red-glow), 0 0 10px var(--red-dim);
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 0.7rem;
+    }
+
+    /* ── Pipeline ── */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 2px;
+      padding: 1rem 0 0.3rem;
+    }
+
+    .p-node {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 5px;
+      padding: 5px 11px;
+      font-size: 0.67rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      white-space: nowrap;
+    }
+
+    .p-node.router {
+      border-color: var(--red);
+      color: var(--red);
+      box-shadow: 0 0 14px #ef444430;
+    }
+
+    .p-node.fallback {
+      border-color: #ef444450;
+      color: #ef4444aa;
+    }
+
+    .p-arrow {
+      color: var(--red);
+      font-size: 0.8rem;
+      padding: 0 3px;
+      opacity: 0.75;
+    }
+
+    .pipeline-sub {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      padding: 0.15rem 0 1.2rem;
+      font-size: 0.62rem;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      justify-content: center;
+      padding: 0 0 1.6rem;
+    }
+
+    .l-chip {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      padding: 2px 9px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    /* ── Input card ── */
+    .input-card {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 1.3rem;
+      margin-bottom: 1rem;
+    }
+
+    .field-label {
+      font-size: 0.67rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.55rem;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.92rem;
+      padding: 0.85rem 1rem;
+      resize: vertical;
+      min-height: 120px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    textarea:focus {
+      border-color: var(--red);
+      box-shadow: 0 0 0 2px var(--red-dim);
+    }
+
+    textarea::placeholder { color: #3d3d3d; }
+
+    .btn-row { display: flex; gap: 10px; margin-top: 0.85rem; }
+
+    .btn {
+      padding: 9px 24px;
+      border-radius: 5px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 0.78rem;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border: none;
+      transition: all 0.18s;
+    }
+
+    .btn-run {
+      background: var(--red);
+      color: #fff;
+      box-shadow: 0 0 18px #ef444440;
+    }
+
+    .btn-run:hover:not(:disabled) {
+      box-shadow: 0 0 32px var(--red-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-run:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-clear {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border2);
+    }
+
+    .btn-clear:hover { border-color: #4b5563; color: #9ca3af; }
+
+    /* ── Loading ── */
+    .loading {
+      display: none;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding-bottom: 0.8rem;
+    }
+
+    .loading.on { display: flex; }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid #222;
+      border-top-color: var(--red);
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Results ── */
+    .results {
+      display: none;
+      gap: 12px;
+    }
+
+    .results.on {
+      display: flex;
+      animation: fadeUp 0.3s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .answer-panel {
+      flex: 3;
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 1.2rem;
+    }
+
+    .meta-panel {
+      flex: 1;
+      min-width: 185px;
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .answer-text {
+      font-size: 0.93rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 0.5rem;
+      min-height: 50px;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 4px 11px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    /* ── Error ── */
+    .err {
+      display: none;
+      background: #120808;
+      border: 1px solid #ef444450;
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      color: var(--red);
+      font-size: 0.82rem;
+      margin-bottom: 1rem;
+    }
+
+    .err.on { display: block; }
+
+    /* ── Examples ── */
+    .examples { margin-top: 2rem; }
+
+    .examples-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 0.7rem;
+    }
+
+    .ex-chip {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 5px 13px;
+      font-size: 0.73rem;
+      color: #7a7a7a;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: 'Inter', sans-serif;
+      text-align: left;
+    }
+
+    .ex-chip:hover {
+      border-color: var(--red);
+      color: var(--red);
+      background: var(--red-dim);
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.72rem;
+      color: #3d3d3d;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .results.on { flex-direction: column; }
+      .pipeline { font-size: 0.6rem; }
+      .p-node { padding: 4px 8px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <h1><span class="white">BudgetBrain</span> <span class="red">Track 1</span></h1>
+    <p>Accurate answers &nbsp;·&nbsp; Lower tokens &nbsp;·&nbsp; Docker-ready</p>
+  </header>
+
+  <!-- Pipeline -->
+  <div class="pipeline">
+    <div class="p-node">📄 Input Tasks</div>
+    <div class="p-arrow">──▶</div>
+    <div class="p-node router">🧠 Category Router</div>
+    <div class="p-arrow">──▶</div>
+    <div class="p-node">⚡ Local Solvers</div>
+    <div class="p-arrow">──▶</div>
+    <div class="p-node">📦 Answers JSON</div>
+  </div>
+  <div class="pipeline-sub">
+    <span>↓ fallback</span>
+    <div class="p-node fallback">☁ Fireworks AI</div>
+    <span>↑ answer</span>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend" id="legend"></div>
+
+  <!-- Input -->
+  <div class="input-card">
+    <div class="field-label">Prompt</div>
+    <textarea id="prompt"
+      placeholder="Ask anything — math, sentiment, NER, logic puzzle, code debug, code generation, summarization, factual Q&amp;A…"
+      rows="5"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-run" id="runBtn" onclick="run()">RUN ▶</button>
+      <button class="btn btn-clear" onclick="clearAll()">CLEAR</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    Routing prompt…
+  </div>
+
+  <!-- Error -->
+  <div class="err" id="err"></div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <div class="answer-panel">
+      <div class="field-label">Answer</div>
+      <div class="answer-text" id="answer"></div>
+    </div>
+    <div class="meta-panel">
+      <div>
+        <div class="field-label">Category</div>
+        <div id="catBadge"></div>
+      </div>
+      <div>
+        <div class="field-label">Solver Path</div>
+        <div id="srcBadge"></div>
+      </div>
+      <div>
+        <div class="field-label">Token Efficiency</div>
+        <div id="tokenBadge"></div>
+      </div>
+      <div>
+        <div class="field-label">Confidence</div>
+        <div id="confBadge"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Examples -->
+  <div class="examples">
+    <div class="field-label">Example prompts — click to try</div>
+    <div class="examples-grid" id="exGrid"></div>
+  </div>
+
+  <footer>AMD Developer Hackathon ACT II · Track 1 · BudgetBrain</footer>
+</div>
+
+<script>
+const CATS = {
+  factual_qa:      { label: '📚 Factual Q&A',    color: '#6366f1', local: false },
+  math:            { label: '🔢 Math',            color: '#10b981', local: true  },
+  sentiment:       { label: '💬 Sentiment',       color: '#f59e0b', local: true  },
+  summarization:   { label: '📝 Summarization',   color: '#3b82f6', local: false },
+  ner:             { label: '🏷️ NER',             color: '#8b5cf6', local: true  },
+  code_debugging:  { label: '🐛 Code Debug',      color: '#ef4444', local: true  },
+  logic:           { label: '🧩 Logic',           color: '#ec4899', local: true  },
+  code_generation: { label: '⚙️ Code Gen',        color: '#14b8a6', local: false },
+};
+
+const EXAMPLES = [
+  'What is the capital of Japan?',
+  'A store sells apples for $1.20 each. Sarah buys 15 and pays $25. How much change does she get?',
+  "Classify the sentiment: 'The movie was absolutely breathtaking — the score was unforgettable.'",
+  'Summarize in one sentence: Python was created by Guido van Rossum in 1991. It emphasizes readability, supports multiple paradigms, and has a vast ecosystem of libraries used worldwide.',
+  "Extract named entities: 'Elon Musk visited Tesla\u2019s Gigafactory Berlin on Tuesday with Chancellor Olaf Scholz.'",
+  'Fix the bug:\n```python\ndef find_max(lst)\n    return max(lst)\n```',
+  'Logic puzzle: Alice, Bob, Carol each own one pet: cat, dog, or bird. Alice doesn\u2019t have the cat. Bob doesn\u2019t have the dog. Carol has the bird. Who has the cat?',
+  'Write a Python function that checks if a string is a palindrome.',
+];
+
+// Build legend
+const legendEl = document.getElementById('legend');
+for (const cat of Object.values(CATS)) {
+  const s = document.createElement('span');
+  s.className = 'l-chip';
+  s.style.cssText = `background:${cat.color}18;color:${cat.color};border:1px solid ${cat.color}44;`;
+  s.textContent = (cat.local ? '⚡ ' : '☁ ') + cat.label;
+  legendEl.appendChild(s);
+}
+
+// Build examples
+const exGrid = document.getElementById('exGrid');
+EXAMPLES.forEach(ex => {
+  const btn = document.createElement('button');
+  btn.className = 'ex-chip';
+  btn.textContent = ex.length > 60 ? ex.slice(0, 60) + '…' : ex;
+  btn.onclick = () => {
+    document.getElementById('prompt').value = ex;
+    document.getElementById('prompt').focus();
+  };
+  exGrid.appendChild(btn);
+});
+
+async function run() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) return;
+
+  const runBtn  = document.getElementById('runBtn');
+  const loading = document.getElementById('loading');
+  const results = document.getElementById('results');
+  const errEl   = document.getElementById('err');
+
+  runBtn.disabled = true;
+  loading.classList.add('on');
+  results.classList.remove('on');
+  errEl.classList.remove('on');
+
+  try {
+    const res  = await fetch('/api/solve', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ prompt }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Answer
+    document.getElementById('answer').textContent = data.answer;
+
+    // Category
+    const cat  = CATS[data.category] || { label: data.category, color: '#6b7280' };
+    const catEl = document.getElementById('catBadge');
+    catEl.innerHTML = badge(cat.label, cat.color);
+
+    // Source
+    const srcEl = document.getElementById('srcBadge');
+    if (data.is_local) {
+      srcEl.innerHTML = badge('⚡ Local · ' + (data.method || 'solver'), '#22c55e', true);
+    } else {
+      srcEl.innerHTML = badge('☁ Fireworks AI', '#ef4444', true);
+    }
+
+    // Token efficiency
+    const tokEl = document.getElementById('tokenBadge');
+    if (data.is_local) {
+      tokEl.innerHTML = `<span style="color:#22c55e;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;">▓▓▓ 0 FIREWORKS TOKENS</span>`;
+    } else {
+      tokEl.innerHTML = `<span style="color:#ef4444;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;">░░░ FIREWORKS TOKENS USED</span>`;
+    }
+
+    // Confidence
+    const pct = data.confidence != null ? Math.round(data.confidence * 100) + '%' : '—';
+    document.getElementById('confBadge').innerHTML =
+      `<span style="color:#9ca3af;font-size:0.88rem;font-weight:600;">${pct}</span>`;
+
+    results.classList.add('on');
+  } catch (err) {
+    errEl.textContent = '⚠ ' + err.message;
+    errEl.classList.add('on');
+  } finally {
+    runBtn.disabled = false;
+    loading.classList.remove('on');
+  }
+}
+
+function badge(text, color, glow = false) {
+  const shadow = glow ? `box-shadow:0 0 10px ${color}66;` : '';
+  return `<span class="badge" style="background:${color}20;color:${color};border:1px solid ${color};${shadow}">${text}</span>`;
+}
+
+function clearAll() {
+  document.getElementById('prompt').value = '';
+  document.getElementById('results').classList.remove('on');
+  document.getElementById('err').classList.remove('on');
+  document.getElementById('prompt').focus();
+}
+
+// Ctrl/Cmd+Enter or just Enter to run (Shift+Enter for newline)
+document.getElementById('prompt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); run(); }
+});
+</script>
+</body>
+</html>
