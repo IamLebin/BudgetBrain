@@ -97,7 +97,18 @@ def _looks_like_logic(lower: str) -> bool:
         "knights and knaves",
         "if and only if",
     )
-    return any(signal in lower for signal in signals)
+    if any(signal in lower for signal in signals):
+        return True
+        
+    # Ordering / Ranking puzzles
+    if re.search(r"\b(older|taller|faster|shorter|youngest|oldest|tallest)\b", lower):
+        return True
+        
+    # Deduction puzzles (if P then Q)
+    if re.search(r"\bif\b.+\bthen\b", lower) or (re.search(r"\bif\b", lower) and "," in lower):
+        return True
+        
+    return False
 
 
 def _looks_like_math(lower: str) -> bool:

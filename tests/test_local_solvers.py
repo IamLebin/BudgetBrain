@@ -7,6 +7,7 @@ from app.agent import solve_prompt
 from eval.run_local_eval import FakeFireworksClient
 from fireworks.client import FireworksClient, parse_allowed_models
 from router.classify import classify_prompt
+from solvers.logic_solver import solve_logic
 from solvers.math_solver import solve_math
 from solvers.ner_solver import solve_ner
 from solvers.sentiment_solver import solve_sentiment
@@ -53,6 +54,119 @@ class LocalSolverTests(unittest.TestCase):
         self.assertEqual(solved.category, "factual_qa")
         self.assertEqual(solved.source, "fireworks")
         self.assertEqual(solved.answer, "Tokyo")
+
+
+class LogicSolverTests(unittest.TestCase):
+    """Tests for the expanded logic puzzle solver."""
+
+    # --- Truth-teller puzzles ---
+
+    def test_two_person_exactly_one(self) -> None:
+        prompt = (
+            'Logic puzzle: exactly one statement is true. '
+            'Alice says "Bob is lying". Bob says "Alice is lying". '
+            'Who is telling the truth?'
+        )
+        result = solve_logic(prompt)
+        self.assertIsNotNone(result)
+        self.assertIn(result.answer, ("Alice", "Bob"))
+
+    def test_three_person_exactly_one(self) -> None:
+        # Alice says Bob is truthful, Bob says Carol is lying, Carol says Alice is lying.
+        # Exactly one is telling the truth.
+        prompt = (
+            'Logic puzzle: exactly one of the following statements is true. '
+            'Alice says "Bob is telling the truth". '
+            'Bob says "Carol is lying". '
+            'Carol says "Alice is lying". '
+            'Who is telling the truth?'
+        )
+        result = solve_logic(prompt)
+        self.assertIsNotNone(result)
+        # Should find exactly one truth-teller
+        self.assertEqual(len(result.answer.split(", ")), 1)
+        self.assertIn(result.answer, ("Alice", "Bob", "Carol"))
+
+    def test_truth_teller_honest_variant(self) -> None:
+        # Dan says Eve is lying, Eve says Dan is lying. Exactly one is truthful.
+        prompt = (
+            'Exactly one statement is true. '
+            'Dan says "Eve is lying". Eve says "Dan is dishonest". '
+            'Who is telling the truth?'
+        )
+        result = solve_logic(prompt)
+        self.assertIsNotNone(result)
+        self.assertIn(result.answer, ("Dan", "Eve"))
+
+    def test_truth_teller_returns_none_for_unparseable(self) -> None:
+        # A statement we can't evaluate should cause a None return
+        prompt = (
+            'Exactly one statement is true. '
+            'Alice says "the sky is blue". Bob says "water is wet". '
+            'Who is telling the truth?'
+        )
+        result = solve_logic(prompt)
+        self.assertIsNone(result)
+
+    # --- Ordering puzzles ---
+
+    def test_ordering_tallest(self) -> None:
+        prompt = (
+            "Alice is taller than Bob. Bob is taller than Carol. "
+            "Who is the tallest?"
+        )
+        result = solve_logic(prompt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.answer, "Alice")
+
+    def test_ordering_shortest(self) -> None:
+        prompt = (
+            "Alice is taller than Bob. Bob is taller than Carol. "
+            "Who is the shortest?"
+        )
+        result = solve_logic(prompt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.answer, "Carol")
+
+    def test_ordering_oldest(self) -> None:
+        prompt = (
+            "Dan is older than Eve. Eve is older than Frank. "
+            "Frank is older than Grace. Who is the oldest?"
+        )
+        result = solve_logic(prompt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.answer, "Dan")
+
+    def test_ordering_ambiguous_returns_none(self) -> None:
+        # Two independent chains — can't determine single tallest
+        prompt = (
+            "Alice is taller than Bob. Carol is taller than Dave. "
+            "Who is the tallest?"
+        )
+        result = solve_logic(prompt)
+        self.assertIsNone(result)
+
+    # --- Deduction puzzles ---
+
+    def test_modus_tollens(self) -> None:
+        prompt = (
+            "If it rains, the ground is wet. "
+            "The ground is dry. "
+            "Did it rain?"
+        )
+        result = solve_logic(prompt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.answer, "No")
+
+    def test_modus_ponens(self) -> None:
+        prompt = (
+            "If the alarm rings, the door opens. "
+            "The alarm rings. "
+            "Does the door open?"
+        )
+        result = solve_logic(prompt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.answer, "Yes")
 
 
 if __name__ == "__main__":

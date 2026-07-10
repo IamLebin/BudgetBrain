@@ -40,14 +40,14 @@ MAX_TOKENS = {
 }
 
 SYSTEM_PROMPTS = {
-    "factual_qa": "Answer directly and concisely. Return only the answer.",
-    "math": "Solve the problem. Return only the final answer.",
-    "sentiment": "Classify sentiment as positive, negative, or neutral. Return one word.",
-    "summarization": "Summarize the text clearly and briefly. Return only the summary.",
-    "ner": "Extract requested entities. Return only the requested entities in the requested format.",
-    "code_debugging": "Fix or identify the bug. Return only the requested answer or corrected code.",
-    "logic": "Solve the logic puzzle. Return only the final answer.",
-    "code_generation": "Write code that satisfies the prompt. Return only code unless asked otherwise.",
+    "factual_qa": "Return only the direct answer.",
+    "math": "Return only the final numeric answer.",
+    "sentiment": "Classify as positive, negative, or neutral. Return 1 word.",
+    "summarization": "Summarize briefly. Return only the summary.",
+    "ner": "Return only requested entities in requested format.",
+    "code_debugging": "Return only the fix or corrected code.",
+    "logic": "Return only the final answer.",
+    "code_generation": "Return only code. No explanations.",
 }
 
 

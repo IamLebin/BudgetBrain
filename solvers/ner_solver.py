@@ -103,10 +103,14 @@ def _label_name(source: str, start: int, value: str) -> str | None:
     words = value.split()
     previous = re.findall(r"\b[A-Za-z]+\b", source[:start])
     previous_word = previous[-1].lower() if previous else ""
-    if previous_word in LOCATION_PREPOSITIONS:
-        return "LOCATION"
+    
+    # Explicit ORG suffixes trump LOCATION prepositions ("at Microsoft Corp")
     if words[-1] in ORG_SUFFIXES or value.isupper() or (len(words) == 1 and _has_internal_capital(value)):
         return "ORG"
+        
+    if previous_word in LOCATION_PREPOSITIONS:
+        return "LOCATION"
+        
     if len(words) >= 2:
         return "PERSON"
     return None

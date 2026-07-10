@@ -46,7 +46,21 @@
     "category": "logic",
     "prompt": "Logic puzzle: exactly one statement is true. Alice says \"Bob is lying\". Bob says \"Alice is lying\". Who is telling the truth?",
     "expected": "Alice",
-    "requires_fireworks": true
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "logic-2",
+    "category": "logic",
+    "prompt": "Dan is older than Eve. Eve is older than Frank. Who is the oldest?",
+    "expected": "Dan",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "logic-3",
+    "category": "logic",
+    "prompt": "If it rains, the ground is wet. The ground is dry. Did it rain?",
+    "expected": "No",
+    "requires_fireworks": false
   },
   {
     "task_id": "code-gen-1",

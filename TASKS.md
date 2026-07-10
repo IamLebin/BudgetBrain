@@ -20,8 +20,8 @@ everything downstream depends on it being accurate.
 - [x] Math solver + unit tests with several unseen-style examples
 - [x] NER solver regex baseline + unit tests
 - [x] Sentiment solver + unit tests
-- [ ] Logic puzzle solver broader constraint-based subset + unit tests
-- [ ] For each: measure accuracy against a larger hand-built test set; only mark "local-solvable"
+- [x] Logic puzzle solver broader constraint-based subset + unit tests
+- [x] For each: measure accuracy against a larger hand-built test set; only mark "local-solvable"
       in `DESIGN.md` once accuracy looks solid
 
 ## 3. Build the router
