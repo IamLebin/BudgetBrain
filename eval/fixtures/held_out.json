@@ -1,0 +1,124 @@
+[
+  {
+    "task_id": "factual-concept",
+    "category": "factual_qa",
+    "prompt": "Explain photosynthesis in one concise sentence.",
+    "contains": ["plants", "light", "energy"],
+    "fake_answer": "Plants use light energy to convert carbon dioxide and water into chemical energy, releasing oxygen.",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "factual-number",
+    "category": "factual_qa",
+    "prompt": "What does the HTTP status code 404 mean?",
+    "contains": ["not found"],
+    "fake_answer": "The requested resource was not found on the server.",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "math-discount",
+    "category": "math",
+    "prompt": "An 80 dollar jacket is sold at a 25% discount. What is the sale price?",
+    "expected": "60",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "math-expression",
+    "category": "math",
+    "prompt": "Calculate (18 - 6) / 3 + 5.",
+    "expected": "9",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "sentiment-negative",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment: The service is unreliable and frustrating.",
+    "expected": "negative",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "sentiment-neutral",
+    "category": "sentiment",
+    "prompt": "Classify as positive, negative, or neutral: The package arrived on Tuesday as scheduled.",
+    "contains": [],
+    "contains_any": ["neutral", "positive"],
+    "fake_answer": "neutral",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "summary-length",
+    "category": "summarization",
+    "prompt": "Summarize in no more than 20 words: The library extended weekend hours, added quiet study rooms, and introduced free coding workshops after students requested more evening resources.",
+    "contains": ["library", "hours", "study", "coding"],
+    "fake_answer": "The library expanded hours, study space, and coding workshops in response to student requests.",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "summary-format",
+    "category": "summarization",
+    "prompt": "Summarize this update in two bullet points: The release fixes login failures on older phones. It also reduces image upload time and adds clearer error messages.",
+    "contains": ["login", "upload", "error"],
+    "fake_answer": "- Fixes login failures on older phones.\n- Speeds image uploads and improves error messages.",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "ner-title",
+    "category": "ner",
+    "prompt": "Extract named entities and types from: Dr. Ada Lovelace joined Analytical Engine Institute in London on 2026-07-10.",
+    "contains": ["Ada Lovelace", "PERSON", "Analytical Engine Institute", "ORG", "London", "LOCATION", "2026-07-10", "DATE"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "ner-location",
+    "category": "ner",
+    "prompt": "Identify entities and their types from: NASA opened an office in New York City in March 2026.",
+    "contains": ["NASA", "ORG", "New York City", "LOCATION", "March 2026", "DATE"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "debug-syntax",
+    "category": "code_debugging",
+    "prompt": "Fix the bug in this Python code:\n```python\nfor item in items\n    print(item)\n```",
+    "contains": ["for item in items:", "print(item)"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "debug-index",
+    "category": "code_debugging",
+    "prompt": "This function raises IndexError for non-empty lists. Find and fix the bug:\n```python\ndef last(items):\n    return items[len(items)]\n```",
+    "contains": ["def last", "return items["],
+    "fake_answer": "def last(items):\n    return items[-1]",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "logic-truth",
+    "category": "logic",
+    "prompt": "Logic puzzle: exactly one statement is true. Ava says \"Ben is lying\". Ben says \"Ava is lying\". Cora says \"Ava is lying\". Who is telling the truth?",
+    "expected": "Ava",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "logic-deduction",
+    "category": "logic",
+    "prompt": "Logical deduction: All red keys open the vault. Key A is red. Does Key A open the vault?",
+    "expected": "Yes",
+    "fake_answer": "Yes",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "code-palindrome",
+    "category": "code_generation",
+    "prompt": "Write a Python function is_palindrome(text) that ignores case and non-alphanumeric characters.",
+    "contains": ["def is_palindrome", "isalnum", "lower"],
+    "fake_answer": "def is_palindrome(text):\n    cleaned = ''.join(c.lower() for c in text if c.isalnum())\n    return cleaned == cleaned[::-1]",
+    "requires_fireworks": true
+  },
+  {
+    "task_id": "code-sql",
+    "category": "code_generation",
+    "prompt": "Write an SQL query that returns each department_id and its average salary from employees, ordered by average salary descending.",
+    "contains": ["department_id", "AVG", "GROUP BY", "ORDER BY"],
+    "fake_answer": "SELECT department_id, AVG(salary) AS average_salary FROM employees GROUP BY department_id ORDER BY average_salary DESC;",
+    "requires_fireworks": true
+  }
+]

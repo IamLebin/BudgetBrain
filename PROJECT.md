@@ -16,8 +16,9 @@ Task categories:
 
 ## Why this design, not "just call an LLM for everything"
 Scoring works in two stages:
-1. **Accuracy gate** — must clear a minimum accuracy threshold (exact number TBD, confirm from
-   Participant Guide) or the submission doesn't get ranked at all.
+1. **Accuracy gate** — must clear **80%**. The eval has **19 fixed tasks**, so the practical
+   target is at least **16/19 correct**. Below the gate, the submission does not appear near
+   the top of the leaderboard regardless of token count.
 2. **Token efficiency ranking** — among submissions that clear the gate, ranked by fewest
    Fireworks tokens consumed.
 
@@ -30,9 +31,14 @@ only when you must."
 ## Hard constraints (from hackathon rules)
 - Submit a **Docker image**, publicly pullable, with a **linux/amd64** manifest.
 - Image size **≤ 10GB**.
+- Grading environment is constrained: **4 GB RAM, 2 vCPU**.
+- Container maximum runtime is **10 minutes**; each model request is bounded below the
+  guide's **30-second** response limit, and startup must complete within **60 seconds**.
+- All answers must be in English.
 - **No hardcoded/cached answers** — eval uses unseen input variants. Any lookup table keyed on
   exact input text is disqualifying, not just risky.
 - Submissions are **rate-limited** — must test the full pipeline locally before each submit.
+- The current rate limit is **10 submissions per hour per team**.
 - Allowed Fireworks models (Track 1 only):
   - `minimax-m3`
   - `kimi-k2p7-code`
@@ -41,6 +47,9 @@ only when you must."
   - `gemma-4-31b-it-nvfp4`
 - Bonus: separate prize pool for best use of a **Gemma** model via Fireworks in Track 1 — worth
   slotting a Gemma model into at least one category if accuracy/tokens are competitive.
+- Gemma models are allowed but on-demand: a 404 from Fireworks may mean the model is not
+  deployed. The cheapest recommended Gemma deployment still bills while idle, so do not rely
+  on Gemma unless actively testing or intentionally competing for the Gemma prize.
 
 ## Deadline
 Hackathon runs **July 6–11, 2026**. Confirm exact submission cutoff + timezone from the
@@ -58,10 +67,11 @@ not something I could read directly)
   - `FIREWORKS_API_KEY`
   - `FIREWORKS_BASE_URL`
   - `ALLOWED_MODELS`
-- [ ] The accuracy gate threshold and how it's measured per category
+- [x] Accuracy gate: 80%; eval has 19 fixed tasks, so aim for at least 16/19 correct.
 - [x] Entrypoint is a file-based batch runner, not an HTTP endpoint:
   read `/input/tasks.json`, write `/output/results.json`.
-- [ ] Per-request or per-run token accounting (does session context carry over?)
+- [x] Token score counts only tokens routed through `FIREWORKS_BASE_URL`; correct local
+  answers count for accuracy with zero Fireworks tokens.
 
 **Current implementation task:** keep the Docker runner aligned to the Participant Guide
 contract above and avoid hardcoded/cached answers.
@@ -76,3 +86,13 @@ contract above and avoid hardcoded/cached answers.
 - Fewest possible Fireworks tokens per correct answer
 - Docker image builds, runs, and is pullable clean on a fresh machine
 - No category silently fails or times out
+
+## Current competitive target (July 10, 2026, 21:40 MYT snapshot)
+- Public Track 1 leader: `1,992` tokens at `84.2%` (`16/19`).
+- Best visible 100% result: `3,358` tokens.
+- Our final official-practice Docker run: `8/8`, `446` Fireworks tokens, with five tasks
+  solved locally.
+- Our final all-remote reasoning stress run: `8/8`, `1,497` Fireworks tokens.
+
+Leaderboard values can move before the deadline; the implementation target is therefore
+`>=16/19` accuracy and comfortably below `1,992` tokens, not merely matching the snapshot.

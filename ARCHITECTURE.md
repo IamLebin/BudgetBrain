@@ -57,6 +57,18 @@ a wrong "free" answer still fails the accuracy gate.
   - A minimal, tuned system prompt (short — every token counts)
   - The cheapest allowed model that clears accuracy for that category in your local tests
   - A conservative `max_tokens` cap
+- Model routing prefers non-Gemma defaults first because Gemma is on-demand and can return
+  404 if not deployed. Gemma remains an allowed fallback/bonus path when explicitly available.
+- If a selected model returns an availability-style HTTP error, try the next allowed model
+  instead of failing the whole task.
+- Preserve the exact model IDs injected by `ALLOWED_MODELS` when using the judging proxy.
+  Shorthand IDs are expanded only for direct local calls to `api.fireworks.ai`.
+- Disable reasoning for short factual, summarization, sentiment, NER, and simple code tasks;
+  retain low reasoning for complex math, logic, debugging, and code generation.
+- Bound every HTTP call to 25 seconds and recover from unavailable, rate-limited, server-error,
+  empty-content, or malformed model responses without calling a model outside the allow-list.
+- Normalize Markdown code fences, sentiment labels, yes/no conclusions, and math final-answer
+  lines before writing the result.
 - Central token counter/logger so you can see running token spend during local testing.
 
 ### 4. Batch Entry Point (`app/main.py`)
@@ -80,6 +92,11 @@ fails, using a short error-safe fallback answer rather than crashing the entire 
 - No secrets baked into the image — Fireworks API key comes from environment variable at
   runtime, not hardcoded.
 - Current implementation has no third-party Python dependencies, keeping the image small.
+- The final Dockerfile performs no package-install step, so builds do not depend on a package
+  index and the runtime image stays near `45.5 MB` by Docker's content-size measurement.
+- Grading resources are 4 GB RAM and 2 vCPU, so any local model strategy must fit comfortably
+  inside that budget. The current implementation uses rule-based local solvers instead of
+  bundled local LLM weights.
 
 ## Directory layout
 
@@ -109,7 +126,7 @@ fails, using a short error-safe fallback answer rather than crashing the entire 
     └── run_local_eval.py   # local harness — run this before every real submission
 ```
 
-## Environment variables (placeholder — confirm exact names from guide)
+## Environment variables
 ```
 FIREWORKS_API_KEY=
 FIREWORKS_BASE_URL=https://api.fireworks.ai/inference/v1
@@ -117,6 +134,12 @@ ALLOWED_MODELS=minimax-m3,kimi-k2p7-code,gemma-4-31b-it,gemma-4-26b-a4b-it,gemma
 ```
 
 ## Token accounting
-Log every Fireworks call's `usage.total_tokens` (or prompt+completion tokens, per the API
-response) to a local file during testing, so you can see per-category and total spend before
-you ever submit — don't discover your token cost from the leaderboard.
+Log every Fireworks call's `usage.total_tokens` plus prompt/completion breakdown to stderr
+during testing, so per-category and total spend are visible without changing
+`/output/results.json`.
+
+## Timing budget
+- Startup: Python-only imports, comfortably under 60 seconds.
+- Per Fireworks request: 25-second socket timeout.
+- Worst-case sequential timeout budget for 19 tasks: `19 x 25 = 475` seconds, below the
+  10-minute container limit even before considering that local tasks return immediately.
