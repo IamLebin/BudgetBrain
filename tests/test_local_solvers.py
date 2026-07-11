@@ -541,6 +541,14 @@ class LocalSolverTests(unittest.TestCase):
         )
         self.assertEqual(
             clean_model_answer(
+                "Favorable.",
+                "sentiment",
+                "Determine whether this review is favorable or unfavorable.",
+            ),
+            "favorable",
+        )
+        self.assertEqual(
+            clean_model_answer(
                 "**Final price: 108**\n\nStep-by-step:\n- Start: 100",
                 "math",
                 "What is the final price?",
@@ -612,6 +620,24 @@ class LocalSolverTests(unittest.TestCase):
                 "code_debugging",
                 prompt,
             )
+
+        with self.assertRaisesRegex(FireworksError, "omitted.*Python fix"):
+            validate_model_answer(
+                "The function returns the first item instead of the maximum.",
+                "code_debugging",
+                prompt,
+            )
+
+        validate_model_answer(
+            "The TypeError means the function combines incompatible operand types.",
+            "code_debugging",
+            "I get a TypeError in this Python function; why does it fail?",
+        )
+        validate_model_answer(
+            "The Java method returns the wrong value; return the computed total instead.",
+            "code_debugging",
+            "Fix this Java method: ```java\nint total() { return 0; }\n```",
+        )
 
         validate_model_answer(
             "def get_max(nums):\n    return max(nums)",
@@ -738,6 +764,36 @@ class LocalSolverTests(unittest.TestCase):
         client = TruncationRetryClient()
         self.assertEqual(client.solve("Who owns the cat?", "logic"), "Sam owns the cat.")
         self.assertEqual(client.calls, 2)
+
+    def test_fireworks_recovers_complete_factual_sentence_from_truncation(self) -> None:
+        class FactualTruncationClient(FireworksClient):
+            def __init__(self) -> None:
+                super().__init__(
+                    api_key="test",
+                    base_url="https://api.fireworks.ai/inference/v1",
+                    allowed_models=["kimi-k2p7-code", "minimax-m3"],
+                )
+                self.calls = 0
+
+            def _post_json(self, path, payload):  # type: ignore[no-untyped-def]
+                self.calls += 1
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "Sentiment analysis classifies emotion in text. Extra unfinished"
+                            },
+                            "finish_reason": "length",
+                        }
+                    ]
+                }
+
+        client = FactualTruncationClient()
+        self.assertEqual(
+            client.solve("What is sentiment analysis?", "factual_qa"),
+            "Sentiment analysis classifies emotion in text.",
+        )
+        self.assertEqual(client.calls, 1)
 
     def test_batch_contract_preserves_order_and_writes_strings(self) -> None:
         tasks = [

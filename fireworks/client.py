@@ -32,7 +32,7 @@ MODEL_PREFERENCE = {
 }
 
 MAX_TOKENS = {
-    "factual_qa": 128,
+    "factual_qa": 256,
     "math": 192,
     "sentiment": 96,
     "summarization": 224,
@@ -44,7 +44,8 @@ MAX_TOKENS = {
 
 SYSTEM_PROMPTS = {
     "factual_qa": (
-        "Answer every part concisely using standard textbook terms; follow the requested format."
+        "Answer every requested part using standard textbook terms and the requested format. "
+        "Unless the user asks for detail, use one sentence of at most 35 words with no preamble."
     ),
     "math": "Solve carefully and verify the arithmetic. Follow the requested format and detail level.",
     "sentiment": "Classify the full text using only allowed labels. Briefly justify when requested.",
@@ -108,10 +109,17 @@ class FireworksClient:
             try:
                 response = self._post_json("/chat/completions", payload)
                 self._log_usage(category, api_model, response.get("usage"))
-                if _response_was_truncated(response):
-                    raise FireworksError("model answer was truncated", status_code=502)
                 content = _response_content(response)
-                answer = clean_model_answer(content, category, prompt)
+                if _response_was_truncated(response):
+                    answer = _recover_truncated_answer(content, category, prompt)
+                    if answer is None:
+                        raise FireworksError("model answer was truncated", status_code=502)
+                    print(
+                        f"recovered complete factual sentence from truncated answer: {api_model}",
+                        file=sys.stderr,
+                    )
+                else:
+                    answer = clean_model_answer(content, category, prompt)
                 validate_model_answer(answer, category, prompt)
                 return answer
             except (KeyError, IndexError, TypeError) as exc:
@@ -240,6 +248,18 @@ def _response_was_truncated(response: dict[str, Any]) -> bool:
     )
 
 
+def _recover_truncated_answer(content: str, category: str, prompt: str) -> str | None:
+    if category != "factual_qa":
+        return None
+    complete_sentence = re.match(r"^(.+?[.!?])(?:\s|$)", content.strip(), flags=re.S)
+    if complete_sentence is None:
+        return None
+    answer = clean_model_answer(complete_sentence.group(1), category, prompt)
+    if len(re.findall(r"\b[A-Za-z][A-Za-z'-]*\b", answer)) < 3:
+        return None
+    return answer
+
+
 def _reasoning_effort(model: str, category: str, prompt: str) -> str | None:
     model_name = canonical_model_name(model)
     if model_name == "minimax-m3":
@@ -309,7 +329,12 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
     if category == "sentiment" and not re.search(
         r"\b(justify|explain|reason|why)\b", prompt, re.I
     ):
-        label = re.search(r"\b(positive|negative|neutral|mixed)\b", answer, re.I)
+        label = re.search(
+            r"\b(positive|negative|neutral|mixed|favorable|unfavorable|"
+            r"favourable|unfavourable)\b",
+            answer,
+            re.I,
+        )
         if label:
             return label.group(1).lower()
     if category == "logic" and not re.search(r"\b(explain|show|justify|why)\b", prompt, re.I):
@@ -333,6 +358,11 @@ def validate_model_answer(answer: str, category: str, prompt: str) -> None:
                 status_code=502,
             )
         python_candidate = _debug_python_candidate(prompt, answer)
+        if _requires_bug_fix(prompt) and _contains_python_source(prompt) and python_candidate is None:
+            raise FireworksError(
+                "model omitted the requested Python fix",
+                status_code=502,
+            )
         if python_candidate is not None:
             try:
                 ast.parse(python_candidate)
@@ -416,6 +446,22 @@ def _requires_bug_diagnosis(prompt: str) -> bool:
     )
 
 
+def _requires_bug_fix(prompt: str) -> bool:
+    return bool(re.search(r"\b(?:fix|repair|correct|corrected|rewrite)\b", prompt, re.I))
+
+
+def _contains_python_source(prompt: str) -> bool:
+    if re.search(r"\b(?:sql|javascript|typescript|java|c\+\+|rust)\b", prompt, re.I):
+        return False
+    return bool(
+        re.search(
+            r"```(?:python|py)?\s*\n|\b(?:async\s+def|def|class)\s+[A-Za-z_]\w*\b",
+            prompt,
+            re.I,
+        )
+    )
+
+
 def _has_bug_diagnosis(answer: str) -> bool:
     try:
         ast.parse(answer)
@@ -463,8 +509,6 @@ def _debug_python_candidate(prompt: str, answer: str) -> str | None:
     )
     if code_start:
         return answer[code_start.start():].strip()
-    if re.search(r"\bpython\b|```python|\bdef\s+[A-Za-z_]", prompt, re.I):
-        return answer
     return None
 
 

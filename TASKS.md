@@ -73,6 +73,8 @@ Current after the latest Discord/guide clarification.
 - [x] Final local candidate `budgetbrain-track1:champion-v2` is `linux/amd64`, `45,525,751` bytes
 - [x] V3 release candidate `budgetbrain-track1:champion-v3-plain` is a single `linux/amd64`
   manifest, `45,527,752` bytes
+- [x] V5 accuracy-first candidate `budgetbrain-track1:champion-v5-accuracy` is a single
+  `linux/amd64` manifest, `45,530,242` bytes
 - [x] Disable provenance and SBOM attachments to remove the `unknown/unknown` manifest that can
   trigger strict evaluator pull failures
 - [x] Push immutable image to public Docker Hub registry
@@ -102,5 +104,8 @@ Current after the latest Discord/guide clarification.
 - [x] Push and anonymously verify the immutable v3 tag
 - [x] Record the v3 digest:
   `sha256:ee7501852fe13c8bc8711f870d37871ee6d52a86b7074b38722ea10bf9c3e68a`
-- [ ] Enter the full replacement reference in the form:
-  `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v3`
+- [x] Push and anonymously verify the immutable v5 accuracy-first tag
+- [x] Record the v5 digest:
+  `sha256:ae93738ccde9c56c0f20ff2a9e13ea29e2917907727d6406dcd00b45c937bc9c`
+- [ ] Enter the current full reference in the form and re-save the submission:
+  `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v5`

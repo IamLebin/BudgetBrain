@@ -87,22 +87,21 @@ contract above and avoid hardcoded/cached answers.
 - Docker image builds, runs, and is pullable clean on a fresh machine
 - No category silently fails or times out
 
-## Current competitive target (July 11, 2026, 21:01 leaderboard snapshot)
-- Public Track 1 leader: `1,797` tokens at `94.7%` (`18/19`).
-- Best visible 100% result: `3,753` tokens.
-- Our v3 official-practice live run: `8/8`, `256` Fireworks tokens, with five tasks
-  solved locally.
-- Our v3 reasoning-stress live run: `8/8`, `262` Fireworks tokens, with six tasks
-  solved locally and only two model calls.
-- Our v3 held-out Docker run: `16/16` at `366` Fireworks tokens, with eleven tasks
-  solved locally and five model calls.
-- Last public image: `lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2`; the evaluator
-  reported `PULL_ERROR` before scoring it.
-- Published replacement: `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v3`,
-  built as a single `linux/amd64` manifest without provenance/SBOM attachments and verified by
-  anonymous remote manifest inspection and pull.
-- Replacement digest:
-  `sha256:ee7501852fe13c8bc8711f870d37871ee6d52a86b7074b38722ea10bf9c3e68a`.
+## Current competitive target (July 11, 2026, 20:18 team screenshot)
+- Lowest visible nonzero result: `1,763` tokens at `84.2%` (`16/19`).
+- Best visible nonzero 100% result: `2,520` tokens.
+- Our v5 official-practice live run: `8/8`, `551` Fireworks tokens, with two tasks
+  solved locally and six model calls.
+- Our v5 held-out live run: `16/16` at `1,023` Fireworks tokens, with four tasks
+  solved locally and twelve model calls.
+- The v5 policy prioritizes semantic accuracy while retaining deterministic zero-token math
+  and logic paths only when confidence is high.
+- Published image: `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v5`, built
+  as a single `linux/amd64` manifest without provenance/SBOM attachments and verified by an
+  empty-config anonymous manifest inspection and pull.
+- Published digest:
+  `sha256:ae93738ccde9c56c0f20ff2a9e13ea29e2917907727d6406dcd00b45c937bc9c`.
 
 Leaderboard values can move before the deadline; the implementation target is therefore
-`>=18/19` accuracy and comfortably below `1,797` tokens, not merely clearing the gate.
+`>=18/19` accuracy and comfortably below the best comparable nonzero result, not merely
+clearing the gate.

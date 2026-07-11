@@ -107,7 +107,7 @@ become your evidence log, not just a plan.
    local accuracy bar.
 
 ## Current validation snapshot
-- Unit tests: `47/47` passing.
+- Unit tests: `54/54` passing.
 - Offline fixtures: baseline `8/8`, official practice `8/8`, held-out `16/16`, local champion
   `17/17` with zero model calls, and reasoning stress `8/8` with two model calls.
 - V3 live official-practice run: `8/8`, three Fireworks calls, `256` tokens.
@@ -118,18 +118,18 @@ become your evidence log, not just a plan.
   implementation used `1,497` tokens on the same prompts.
 - Official accuracy gate: `80%`; real eval has `19` tasks, so clear target is at least
   `16/19` correct.
-- Local zero-token paths currently cover arithmetic and structured word math, lexicon and
-  factual-neutral sentiment, regex NER, safe short bullet summaries,
-  assignment/ordering/implication logic, and safe Python repairs.
+- Normal-scoring zero-token paths cover verified arithmetic, structured word math, and
+  high-confidence assignment/ordering/implication logic. Semantic categories use Fireworks;
+  their local solvers remain emergency fallbacks only.
 - Remote answers are validated for Python syntax, summary bullet/word constraints, and
   requested NER JSON before accepting them; invalid outputs fall back to the next allowed model.
 - Live Fireworks validation works after normalizing shorthand model names to full Fireworks
   model IDs such as `accounts/fireworks/models/minimax-m3`.
-- Docker image `budgetbrain-track1:champion-v3-plain` builds and runs as a single
-  `linux/amd64` manifest; Docker content size is `45,527,752` bytes, comfortably under the
+- Docker image `budgetbrain-track1:champion-v5-accuracy` builds and runs as a single
+  `linux/amd64` manifest; Docker content size is `45,530,242` bytes, comfortably under the
   `10GB` compressed-size limit.
-- Public v3 manifest inspection and an empty-config anonymous pull pass at digest
-  `sha256:ee7501852fe13c8bc8711f870d37871ee6d52a86b7074b38722ea10bf9c3e68a`.
+- Public v5 manifest inspection and an empty-config anonymous pull pass at digest
+  `sha256:ae93738ccde9c56c0f20ff2a9e13ea29e2917907727d6406dcd00b45c937bc9c`.
 - Adversarial routing tests prevent broad phrases from misclassifying factual, math, grammar,
   and non-sentiment classification prompts. Sentiment negation stops at sentence/contrast
   boundaries, and ambiguous capitalized NER spans fall back to Fireworks instead of guessing.

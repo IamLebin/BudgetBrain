@@ -1,0 +1,45 @@
+[
+  {
+    "task_id": "concept-sentiment",
+    "category": "factual_qa",
+    "prompt": "What is sentiment analysis?",
+    "fake_answer": "Sentiment analysis identifies the emotional polarity expressed in text.",
+    "contains": ["sentiment", "text"]
+  },
+  {
+    "task_id": "concept-ner",
+    "category": "factual_qa",
+    "prompt": "Explain named entity recognition and why it is useful.",
+    "fake_answer": "Named entity recognition identifies and categorizes entities in text.",
+    "contains": ["text"],
+    "contains_any": ["entity", "entities", "items"]
+  },
+  {
+    "task_id": "concept-logic",
+    "category": "factual_qa",
+    "prompt": "What is a logic puzzle?",
+    "fake_answer": "A logic puzzle is solved through deduction from stated constraints.",
+    "contains": ["logic", "puzzle"]
+  },
+  {
+    "task_id": "concept-binary-search",
+    "category": "factual_qa",
+    "prompt": "What is the main idea behind binary search?",
+    "fake_answer": "Binary search repeatedly halves a sorted search space.",
+    "contains": ["binary", "sorted"]
+  },
+  {
+    "task_id": "concept-python-function",
+    "category": "factual_qa",
+    "prompt": "Explain how to write a function in Python.",
+    "fake_answer": "Define it with def, parameters, and an indented body.",
+    "contains": ["def", "body"]
+  },
+  {
+    "task_id": "concept-type-error",
+    "category": "factual_qa",
+    "prompt": "Explain what a TypeError means in Python.",
+    "fake_answer": "A TypeError indicates an operation received an incompatible type.",
+    "contains": ["type", "operation"]
+  }
+]
