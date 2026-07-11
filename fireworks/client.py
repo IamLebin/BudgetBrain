@@ -32,25 +32,25 @@ MODEL_PREFERENCE = {
 }
 
 MAX_TOKENS = {
-    "factual_qa": 96,
-    "math": 64,
-    "sentiment": 32,
-    "summarization": 160,
-    "ner": 160,
-    "code_debugging": 240,
-    "logic": 96,
-    "code_generation": 320,
+    "factual_qa": 128,
+    "math": 192,
+    "sentiment": 96,
+    "summarization": 224,
+    "ner": 224,
+    "code_debugging": 384,
+    "logic": 192,
+    "code_generation": 512,
 }
 
 SYSTEM_PROMPTS = {
-    "factual_qa": "Answer every part in one concise sentence using standard key terms.",
-    "math": "Return only the final answer unless steps are requested.",
-    "sentiment": "Return only the requested label unless a reason is requested.",
-    "summarization": "Follow all constraints; output only the summary.",
-    "ner": "Return all entities in the requested format.",
-    "code_debugging": "Return only corrected code unless an explanation is requested.",
-    "logic": "Return only the requested conclusion unless reasoning is requested.",
-    "code_generation": "Return only minimal correct code; prefer built-ins when possible.",
+    "factual_qa": "Answer every requested part accurately. Preserve the requested format; be concise.",
+    "math": "Solve carefully and verify the arithmetic. Follow the requested format and detail level.",
+    "sentiment": "Classify the full text using only allowed labels. Briefly justify when requested.",
+    "summarization": "Preserve key facts and obey every length, count, and format constraint.",
+    "ner": "Extract every requested entity with the correct type and exact requested format.",
+    "code_debugging": "Find the actual bug and provide a correct runnable fix. Explain only when requested.",
+    "logic": "Satisfy every stated constraint, verify the conclusion, and use the requested format.",
+    "code_generation": "Return complete runnable code satisfying the spec and edge cases; no prose unless asked.",
 }
 
 
@@ -96,6 +96,8 @@ class FireworksClient:
             try:
                 response = self._post_json("/chat/completions", payload)
                 self._log_usage(category, api_model, response.get("usage"))
+                if _response_was_truncated(response):
+                    raise FireworksError("model answer was truncated", status_code=502)
                 content = _response_content(response)
                 answer = clean_model_answer(content, category, prompt)
                 validate_model_answer(answer, category, prompt)
@@ -216,6 +218,16 @@ def _response_content(response: dict[str, Any]) -> str:
     raise FireworksError("Fireworks returned unsupported answer content", status_code=502)
 
 
+def _response_was_truncated(response: dict[str, Any]) -> bool:
+    choices = response.get("choices")
+    return bool(
+        isinstance(choices, list)
+        and choices
+        and isinstance(choices[0], dict)
+        and choices[0].get("finish_reason") == "length"
+    )
+
+
 def _reasoning_effort(model: str, category: str, prompt: str) -> str | None:
     model_name = canonical_model_name(model)
     if model_name == "minimax-m3":
@@ -260,7 +272,7 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
         )
         if fenced:
             answer = fenced.group(1).strip()
-    if category == "ner" and re.search(r"\bjson\b", prompt, re.I):
+    if category == "ner":
         fenced_json = re.fullmatch(r"```(?:json)?\s*\n?(.*?)\n?```", answer, flags=re.I | re.S)
         if fenced_json:
             answer = fenced_json.group(1).strip()
@@ -341,7 +353,12 @@ def validate_model_answer(answer: str, category: str, prompt: str) -> None:
 
 
 def _expects_python(prompt: str, answer: str) -> bool:
-    if re.search(r"\b(?:explain|explanation|justify|reason|why)\b", prompt, re.I):
+    if re.search(
+        r"\b(?:explain|explanation|identify|describe|justify|reason|why)\b|"
+        r"\bwhat\s+is\s+wrong\b",
+        prompt,
+        re.I,
+    ):
         return False
     if re.search(r"\bsql\b|\bjavascript\b|\btypescript\b|\bjava\b|\bc\+\+\b", prompt, re.I):
         return False

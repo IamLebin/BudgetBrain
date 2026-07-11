@@ -478,6 +478,10 @@ class LocalSolverTests(unittest.TestCase):
             clean_model_answer("```python\ndef square(n):\n    return n * n\n```", "code_generation"),
             "def square(n):\n    return n * n",
         )
+        self.assertEqual(
+            clean_model_answer('```json\n[{"entity":"Ada","type":"PERSON"}]\n```', "ner"),
+            '[{"entity":"Ada","type":"PERSON"}]',
+        )
 
     def test_short_classification_answers_are_normalized(self) -> None:
         self.assertEqual(
@@ -543,6 +547,38 @@ class LocalSolverTests(unittest.TestCase):
         self.assertEqual(solved.source, "fireworks")
         self.assertEqual(solved.answer, "Tokyo")
 
+    def test_accuracy_first_routes_semantic_categories_to_fireworks(self) -> None:
+        prompts = {
+            'Classify the sentiment: "This is excellent."': "positive",
+            "Summarize in one sentence: The release is stable and fast.": "The release is stable and fast.",
+            "Extract named entities from: Maya Chen visited Paris.": "Maya Chen PERSON Paris LOCATION",
+            "This Python function has a bug: def top(xs): return xs[0]. Fix it.": "def top(xs):\n    return max(xs)",
+        }
+        client = FakeFireworksClient(prompts)
+        for prompt, expected in prompts.items():
+            with self.subTest(prompt=prompt):
+                solved = solve_prompt(prompt, client=client)
+                self.assertEqual(solved.source, "fireworks")
+                self.assertEqual(solved.answer, expected)
+
+        local_math = solve_prompt("What is 7 * (8 + 2)?", client=client)
+        self.assertEqual(local_math.source, "local:safe_eval")
+
+    def test_explanation_requests_escalate_exact_local_answers(self) -> None:
+        math_prompt = "What is 7 * (8 + 2)? Show your work."
+        logic_prompt = (
+            "All red keys open the vault. Key A is red. Does Key A open the vault? "
+            "Explain your reasoning."
+        )
+        client = FakeFireworksClient(
+            {
+                math_prompt: "7 * 10 = 70, so the answer is 70.",
+                logic_prompt: "Yes. Key A is red, and all red keys open the vault.",
+            }
+        )
+        self.assertEqual(solve_prompt(math_prompt, client=client).source, "fireworks")
+        self.assertEqual(solve_prompt(logic_prompt, client=client).source, "fireworks")
+
     def test_fireworks_retries_unavailable_model(self) -> None:
         class RetryClient(FireworksClient):
             def __init__(self) -> None:
@@ -588,6 +624,34 @@ class LocalSolverTests(unittest.TestCase):
         answer = client.solve("Write a Python function square(n).", "code_generation")
         self.assertEqual(answer, "def square(n):\n    return n * n")
         self.assertEqual(len(client.models), 2)
+
+    def test_fireworks_retries_truncated_answers(self) -> None:
+        class TruncationRetryClient(FireworksClient):
+            def __init__(self) -> None:
+                super().__init__(
+                    api_key="test",
+                    base_url="https://api.fireworks.ai/inference/v1",
+                    allowed_models=["minimax-m3", "kimi-k2p7-code"],
+                )
+                self.calls = 0
+
+            def _post_json(self, path, payload):  # type: ignore[no-untyped-def]
+                self.calls += 1
+                if self.calls == 1:
+                    return {
+                        "choices": [
+                            {"message": {"content": "Sam owns"}, "finish_reason": "length"}
+                        ]
+                    }
+                return {
+                    "choices": [
+                        {"message": {"content": "Sam owns the cat."}, "finish_reason": "stop"}
+                    ]
+                }
+
+        client = TruncationRetryClient()
+        self.assertEqual(client.solve("Who owns the cat?", "logic"), "Sam owns the cat.")
+        self.assertEqual(client.calls, 2)
 
     def test_batch_contract_preserves_order_and_writes_strings(self) -> None:
         tasks = [

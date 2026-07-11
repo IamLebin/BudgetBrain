@@ -81,11 +81,15 @@ def run_fixture_eval(path: Path, fake_fireworks: bool = False) -> int:
     if not isinstance(fixture, list):
         raise ValueError("fixture must be a JSON array")
 
-    fake_responses = {
-        str(item["prompt"]): str(item["fake_answer"])
-        for item in fixture
-        if "fake_answer" in item
-    }
+    fake_responses: dict[str, str] = {}
+    for item in fixture:
+        prompt = str(item["prompt"])
+        if "fake_answer" in item:
+            fake_responses[prompt] = str(item["fake_answer"])
+        elif "expected" in item:
+            fake_responses[prompt] = str(item["expected"])
+        elif isinstance(item.get("contains"), list):
+            fake_responses[prompt] = " ".join(str(part) for part in item["contains"])
     fake_client = FakeFireworksClient(fake_responses) if fake_fireworks else None
     rows: list[dict[str, Any]] = []
     correct = 0
