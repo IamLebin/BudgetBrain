@@ -14,6 +14,167 @@ def solve_logic(prompt: str) -> LocalAnswer | None:
     assignment = _solve_one_to_one_assignment(prompt)
     if assignment is not None:
         return assignment
+    ordering = _solve_unique_ordering(prompt)
+    if ordering is not None:
+        return ordering
+    conditional = _solve_conditional_deduction(prompt)
+    if conditional is not None:
+        return conditional
+    universal = _solve_universal_application(prompt)
+    if universal is not None:
+        return universal
+    return None
+
+
+def _solve_unique_ordering(prompt: str) -> LocalAnswer | None:
+    setup = re.search(
+        r"\b(?P<names>[A-Z][A-Za-z'-]*(?:\s*,\s*[A-Z][A-Za-z'-]*)+"
+        r"(?:\s*,?\s*(?:and|&)\s*[A-Z][A-Za-z'-]*)?)\s+"
+        r"(?:sit|stand|line\s+up|arrive|finish|are\s+seated)\b",
+        prompt,
+    )
+    if setup is None:
+        return None
+    names = _split_list(setup.group("names"))
+    if not (2 <= len(names) <= 8) or len(set(names)) != len(names):
+        return None
+
+    name_lookup = {name.lower(): name for name in names}
+    name_pattern = "|".join(re.escape(name) for name in sorted(names, key=len, reverse=True))
+    before: set[tuple[str, str]] = set()
+    relation_patterns = (
+        (fr"\b({name_pattern})\s+(?:sits?\s+)?(?:to\s+the\s+)?left\s+of\s+({name_pattern})\b", False),
+        (fr"\b({name_pattern})\s+(?:sits?\s+)?(?:to\s+the\s+)?right\s+of\s+({name_pattern})\b", True),
+        (fr"\b({name_pattern})\s+(?:comes?|arrives?|finishes?)\s+before\s+({name_pattern})\b", False),
+        (fr"\b({name_pattern})\s+(?:comes?|arrives?|finishes?)\s+after\s+({name_pattern})\b", True),
+    )
+    for pattern, reverse in relation_patterns:
+        for match in re.finditer(pattern, prompt, flags=re.IGNORECASE):
+            first = name_lookup[match.group(1).lower()]
+            second = name_lookup[match.group(2).lower()]
+            before.add((second, first) if reverse else (first, second))
+    if not before:
+        return None
+
+    valid = [
+        order
+        for order in permutations(names)
+        if all(order.index(first) < order.index(second) for first, second in before)
+    ]
+    if len(valid) != 1:
+        return None
+    if not re.search(
+        r"\b(?:what|which)\s+is\s+(?:the\s+)?(?:their\s+)?order\b|"
+        r"\border\s+from\s+(?:left\s+to\s+right|first\s+to\s+last)\b",
+        prompt,
+        re.I,
+    ):
+        return None
+    return LocalAnswer(", ".join(valid[0]), 0.99, "unique_ordering")
+
+
+def _solve_conditional_deduction(prompt: str) -> LocalAnswer | None:
+    conditional = re.search(
+        r"\bif\s+(?P<antecedent>[^,.;]+)\s*,\s*(?:then\s+)?"
+        r"(?P<consequent>[^.;]+)[.;]",
+        prompt,
+        flags=re.IGNORECASE,
+    )
+    if conditional is None:
+        return None
+    antecedent = _normalize_proposition(conditional.group("antecedent"))
+    consequent = _normalize_proposition(conditional.group("consequent"))
+    tail = prompt[conditional.end() :]
+    question_match = re.search(r"([^.?]+)\?\s*$", tail.strip())
+    if question_match is None:
+        return None
+    question = _question_proposition(question_match.group(1))
+    if question is None:
+        return None
+
+    facts_text = tail[: question_match.start()]
+    facts = [
+        _normalize_proposition(sentence)
+        for sentence in re.split(r"[.;]", facts_text)
+        if sentence.strip()
+    ]
+    positive_facts: set[str] = set()
+    negative_facts: set[str] = set()
+    for fact in facts:
+        positive, is_negative = _remove_negation(fact)
+        (negative_facts if is_negative else positive_facts).add(positive)
+
+    if question == consequent and antecedent in positive_facts:
+        return LocalAnswer("Yes", 0.99, "modus_ponens")
+    if question == antecedent and consequent in negative_facts:
+        return LocalAnswer("No", 0.99, "modus_tollens")
+    return None
+
+
+def _solve_universal_application(prompt: str) -> LocalAnswer | None:
+    question = re.search(r"\bdoes\s+(?P<body>[^?]+)\?", prompt, re.I)
+    if question is None:
+        return None
+    facts = re.finditer(
+        r"(?:^|[.;]\s*)(?P<subject>[A-Z][A-Za-z0-9' -]*?)\s+is\s+"
+        r"(?:an?\s+|the\s+)?(?P<property>[^.;]+)[.;]",
+        prompt,
+    )
+    question_body = _normalize_proposition(question.group("body"))
+    for fact in facts:
+        subject = fact.group("subject").strip()
+        subject_prefix = _normalize_proposition(subject) + " "
+        if not question_body.startswith(subject_prefix):
+            continue
+        predicate = question_body[len(subject_prefix) :]
+        property_text = _normalize_proposition(fact.group("property"))
+        universal = re.search(
+            r"\ball\s+(?P<class>[^.;]+?)\s+" + re.escape(predicate) + r"[.;]",
+            prompt,
+            re.I,
+        )
+        if universal is None:
+            continue
+        class_text = _normalize_proposition(universal.group("class"))
+        property_words = set(property_text.split())
+        class_words = set(class_text.split())
+        subject_head = subject.split()[0].lower().rstrip("s")
+        class_singulars = {word.rstrip("s") for word in class_words}
+        if property_words and property_words <= class_words and subject_head in class_singulars:
+            return LocalAnswer("Yes", 0.99, "universal_application")
+    return None
+
+
+def _normalize_proposition(text: str) -> str:
+    normalized = re.sub(r"\s+", " ", text.strip().lower())
+    return normalized.strip(" .,:;\"'")
+
+
+def _remove_negation(proposition: str) -> tuple[str, bool]:
+    patterns = (
+        (r"\bis\s+not\b", " is "),
+        (r"\bare\s+not\b", " are "),
+        (r"\bcannot\b", "can"),
+        (r"\bdoes\s+not\b", ""),
+    )
+    for pattern, replacement in patterns:
+        if re.search(pattern, proposition):
+            positive = re.sub(pattern, replacement, proposition, count=1)
+            return _normalize_proposition(positive), True
+    return proposition, False
+
+
+def _question_proposition(question: str) -> str | None:
+    normalized = _normalize_proposition(question)
+    can_be = re.fullmatch(r"can\s+(.+?)\s+be\s+(.+)", normalized)
+    if can_be:
+        return _normalize_proposition(f"{can_be.group(1)} is {can_be.group(2)}")
+    is_question = re.fullmatch(r"is\s+(.+)", normalized)
+    if is_question:
+        return _normalize_proposition(is_question.group(1))
+    does_question = re.fullmatch(r"does\s+(.+)", normalized)
+    if does_question:
+        return _normalize_proposition(does_question.group(1))
     return None
 
 

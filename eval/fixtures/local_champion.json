@@ -1,0 +1,86 @@
+[
+  {
+    "task_id": "local-sequential-percent-1",
+    "category": "math",
+    "prompt": "A price starts at 250, increases by 12%, then decreases by 20%. What is the final price?",
+    "expected": "224",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-sequential-percent-2",
+    "category": "math",
+    "prompt": "The original value is 80, increased by 50 percent and then reduced by 25 percent. Calculate the final value.",
+    "expected": "90",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-average-speed-metric",
+    "category": "math",
+    "prompt": "A bus travels 100 km at 50 km/h and 150 km at 75 km/h. What is its average speed for the whole trip?",
+    "expected": "62.5 km/h",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-average-speed-imperial",
+    "category": "math",
+    "prompt": "A car covers 60 miles at 30 mph, then 120 miles at 60 mph. Compute the average speed.",
+    "expected": "45 mph",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-ratio-first",
+    "category": "math",
+    "prompt": "Apples and oranges are in a 2:3 ratio. There are 40 fruits total. How many are apples?",
+    "expected": "16",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-ratio-second",
+    "category": "math",
+    "prompt": "The ratio of cats to dogs is 4:7. Altogether there are 55 animals. How many dogs are there?",
+    "expected": "35",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-order-left-right",
+    "category": "logic",
+    "prompt": "Logic puzzle: Ana, Bo, and Cy sit in a row. Ana sits left of Bo, and Cy sits right of Bo. What is their order from left to right?",
+    "expected": "Ana, Bo, Cy",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-order-first-last",
+    "category": "logic",
+    "prompt": "Logic puzzle: Inez, Jae, and Kira arrive together. Kira arrives after Jae, and Jae arrives after Inez. What is the order from first to last?",
+    "expected": "Inez, Jae, Kira",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-modus-tollens",
+    "category": "logic",
+    "prompt": "Logical deduction: If the door is locked, the indicator is blue. The indicator is not blue. Can the door be locked?",
+    "expected": "No",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-universal",
+    "category": "logic",
+    "prompt": "Logical deduction: All blue cards enter the room. Card B is blue. Does Card B enter the room?",
+    "expected": "Yes",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-mutable-default",
+    "category": "code_debugging",
+    "prompt": "Find and fix the mutable default bug in this Python function:\n```python\ndef remember(value, seen=[]):\n    seen.append(value)\n    return seen\n```",
+    "contains": ["seen=None", "if seen is None", "seen = []"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-len-index",
+    "category": "code_debugging",
+    "prompt": "This function raises IndexError instead of returning the last value. Fix the bug:\n```python\ndef final(values):\n    return values[len(values)]\n```",
+    "contains": ["def final", "values[-1]"],
+    "requires_fireworks": false
+  }
+]

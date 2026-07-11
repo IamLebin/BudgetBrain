@@ -66,25 +66,28 @@ docker run --rm --platform linux/amd64 \
   budgetbrain-track1:local
 ```
 
-The final verified image is `budgetbrain-track1:champion`, is `linux/amd64`, and has Docker
-content size `45,522,179` bytes. Its latest official-practice container run produced 8 valid,
-non-empty answers with 446 Fireworks tokens across three calls.
+The optimized final image is `budgetbrain-track1:champion-v2`, is `linux/amd64`, and has
+Docker content size `45,525,751` bytes. Final live validation produced `8/8` official answers
+at 251 tokens, `16/16` held-out answers at 483 tokens, and `8/8` Docker reasoning-stress
+answers at 262 tokens.
 
 Published immutable public submission image:
 
 ```text
 lebinbin/budgetbrain-track1:amd-act2-20260710
+lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2
 ```
 
-The image is public on Docker Hub and an anonymous `linux/amd64` pull has been verified.
-Published digest:
+The first tag is the previous submission image. Use the optimized `20260711-champion-v2`
+tag for scoring; its public `linux/amd64` manifest and anonymous pull are verified.
+Optimized published digest:
 
 ```text
-sha256:bb74ac8bf2d2c089a236f578ef82e10e0a9316430fc8f2293bf23468badfedc6
+sha256:c287fee3ea4cc8d631c35734cef6ca315147ee7ee1a3ea22b87fa97bc0bdeb2a
 ```
 
 Anonymous verification:
 
 ```bash
-docker pull --platform linux/amd64 lebinbin/budgetbrain-track1:amd-act2-20260710
+docker pull --platform linux/amd64 lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2
 ```

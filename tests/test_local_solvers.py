@@ -63,14 +63,65 @@ class LocalSolverTests(unittest.TestCase):
         self.assertIsNotNone(solved)
         self.assertEqual(solved.answer, "1102.5")
 
-    def test_math_does_not_partially_solve_multi_step_percentages(self) -> None:
+    def test_math_sequential_percentages(self) -> None:
+        solved = solve_math(
+            "A price starts at 100, increases by 20%, then decreases by 10%. "
+            "What is the final price?"
+        )
+        self.assertIsNotNone(solved)
+        self.assertEqual(solved.answer, "108")
+        variant = solve_math(
+            "The original price is $200, decreased by 25 percent and then increased by "
+            "10 percent. What is the final value?"
+        )
+        self.assertIsNotNone(variant)
+        self.assertEqual(variant.answer, "165")
+        self.assertIsNone(solve_math("What is 20% of 100, then add 10?"))
         self.assertIsNone(
             solve_math(
-                "A price starts at 100, increases by 20%, then decreases by 10%. "
-                "What is the final price?"
+                "A price starts at 100, increases by 20%, then decreases by 10%, "
+                "then adds a 5 dollar fee. What is the final price?"
             )
         )
-        self.assertIsNone(solve_math("What is 20% of 100, then add 10?"))
+
+    def test_math_weighted_average_speed(self) -> None:
+        metric = solve_math(
+            "A train travels 120 km at 60 km/h, then 180 km at 90 km/h. "
+            "What is its average speed for the entire trip?"
+        )
+        self.assertIsNotNone(metric)
+        self.assertEqual(metric.answer, "75 km/h")
+        imperial = solve_math(
+            "A car covers 60 miles at 30 mph and 120 miles at 60 mph. "
+            "Calculate the average speed."
+        )
+        self.assertIsNotNone(imperial)
+        self.assertEqual(imperial.answer, "45 mph")
+        self.assertIsNone(
+            solve_math(
+                "A train travels 120 km at 60 km/h, rests for one hour, then travels "
+                "180 km at 90 km/h. What is its average speed?"
+            )
+        )
+
+    def test_math_ratio_share(self) -> None:
+        solved = solve_math(
+            "Red and blue marbles are in a 3:5 ratio. If there are 64 marbles total, "
+            "how many are blue?"
+        )
+        self.assertIsNotNone(solved)
+        self.assertEqual(solved.answer, "40")
+        variant = solve_math(
+            "The ratio of cats to dogs is 2:3. There are 25 animals total. How many dogs?"
+        )
+        self.assertIsNotNone(variant)
+        self.assertEqual(variant.answer, "15")
+        self.assertIsNone(
+            solve_math(
+                "Red and blue marbles are in a 3:5 ratio. There are 64 total, then 4 "
+                "blue marbles are removed. How many are blue?"
+            )
+        )
 
     def test_sentiment_positive(self) -> None:
         solved = solve_sentiment('Sentiment: "Excellent, smooth, and wonderful."')
@@ -151,6 +202,46 @@ class LocalSolverTests(unittest.TestCase):
         self.assertIsNotNone(solved)
         self.assertEqual(solved.answer, "Sam")
 
+    def test_logic_unique_ordering(self) -> None:
+        solved = solve_logic(
+            "Logic puzzle: Ria, Sol, and Tom sit in one row. Ria sits left of Sol, "
+            "and Tom sits right of Sol. What is their order from left to right?"
+        )
+        self.assertIsNotNone(solved)
+        self.assertEqual(solved.answer, "Ria, Sol, Tom")
+        ambiguous = solve_logic(
+            "Logic puzzle: Ria, Sol, and Tom sit in one row. Ria sits left of Sol. "
+            "What is their order from left to right?"
+        )
+        self.assertIsNone(ambiguous)
+
+    def test_logic_conditional_and_universal_deduction(self) -> None:
+        conditional = solve_logic(
+            "Logical deduction: If the server is offline, the alert is red. "
+            "The alert is not red. Can the server be offline?"
+        )
+        self.assertIsNotNone(conditional)
+        self.assertEqual(conditional.answer, "No")
+        universal = solve_logic(
+            "Logical deduction: All red keys open the vault. Key A is red. "
+            "Does Key A open the vault?"
+        )
+        self.assertIsNotNone(universal)
+        self.assertEqual(universal.answer, "Yes")
+        self.assertEqual(
+            classify_prompt(
+                "If the server is offline, the alert is red. The alert is not red. "
+                "Can the server be offline?"
+            ).category,
+            "logic",
+        )
+        self.assertEqual(
+            classify_prompt(
+                "All red keys open the vault. Key A is red. Does Key A open the vault?"
+            ).category,
+            "logic",
+        )
+
     def test_code_debug_returns_corrected_code(self) -> None:
         solved = solve_code_debug(
             "Find the syntax issue in this Python code:\n"
@@ -166,6 +257,29 @@ class LocalSolverTests(unittest.TestCase):
         )
         self.assertIsNotNone(solved)
         self.assertIn("return max(nums)", solved.answer)
+
+    def test_code_debug_mutable_default_and_len_index(self) -> None:
+        mutable = solve_code_debug(
+            "Find and fix the mutable-default bug:\n"
+            "```python\ndef add_item(item, bucket=[]):\n"
+            "    bucket.append(item)\n    return bucket\n```"
+        )
+        self.assertIsNotNone(mutable)
+        self.assertIn("bucket=None", mutable.answer)
+        self.assertIn("if bucket is None", mutable.answer)
+        nonempty = solve_code_debug(
+            "Fix the mutable default bug:\n"
+            "```python\ndef collect(value, items=[1]):\n"
+            "    items.append(value)\n    return items\n```"
+        )
+        self.assertIsNotNone(nonempty)
+        self.assertIn("items = [1]", nonempty.answer)
+        index = solve_code_debug(
+            "This function raises IndexError for non-empty lists. Find and fix the bug:\n"
+            "```python\ndef last(items):\n    return items[len(items)]\n```"
+        )
+        self.assertIsNotNone(index)
+        self.assertIn("return items[-1]", index.answer)
 
     def test_official_practice_categories(self) -> None:
         cases = {
@@ -199,6 +313,16 @@ class LocalSolverTests(unittest.TestCase):
             allowed_models=["gemma-4-26b-a4b-it", "kimi-k2p7-code"],
         )
         self.assertEqual(client.pick_model("code_generation"), "kimi-k2p7-code")
+
+    def test_fireworks_model_selection_prefers_kimi_for_low_token_language_tasks(self) -> None:
+        client = FireworksClient(
+            api_key="test",
+            base_url="https://example.invalid",
+            allowed_models=["minimax-m3", "kimi-k2p7-code"],
+        )
+        self.assertEqual(client.pick_model("factual_qa"), "kimi-k2p7-code")
+        self.assertEqual(client.pick_model("summarization"), "kimi-k2p7-code")
+        self.assertEqual(client.pick_model("sentiment"), "kimi-k2p7-code")
 
     def test_fireworks_model_selection_avoids_gemma_by_default(self) -> None:
         client = FireworksClient(

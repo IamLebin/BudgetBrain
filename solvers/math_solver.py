@@ -29,6 +29,18 @@ def solve_math(prompt: str) -> LocalAnswer | None:
     if inventory is not None:
         return inventory
 
+    sequential_percent = _solve_sequential_percent_changes(cleaned)
+    if sequential_percent is not None:
+        return sequential_percent
+
+    average_speed = _solve_average_speed(cleaned)
+    if average_speed is not None:
+        return average_speed
+
+    ratio = _solve_ratio_share(cleaned)
+    if ratio is not None:
+        return ratio
+
     percent = _solve_percent(cleaned)
     if percent is not None:
         return percent
@@ -120,6 +132,167 @@ def _solve_inventory_changes(text: str) -> LocalAnswer | None:
         remaining += Fraction(add_match.group(1))
 
     return LocalAnswer(_format_number(remaining), 0.98, "inventory_percent_changes")
+
+
+def _solve_sequential_percent_changes(text: str) -> LocalAnswer | None:
+    number = r"-?\d+(?:\.\d+)?"
+    initial_patterns = (
+        fr"\b(?:starts?|begins?)\s+(?:at|with)\s+\$?(?P<value>{number})\b",
+        fr"\b(?:initial|original|starting)\s+(?:price|value|amount|cost)?\s*"
+        fr"(?:is|was|of|:)\s*\$?(?P<value>{number})\b",
+    )
+    initial_match = next(
+        (
+            match
+            for pattern in initial_patterns
+            if (match := re.search(pattern, text, flags=re.IGNORECASE)) is not None
+        ),
+        None,
+    )
+    if initial_match is None:
+        return None
+
+    tail = text[initial_match.end() :]
+    change_pattern = re.compile(
+        fr"\b(?P<verb>increase[sd]?|rise[sd]?|grow(?:s|n)?|"
+        fr"decrease[sd]?|drop(?:s|ped)?|fall(?:s|en)?|reduc(?:e[sd]?|ed))\s+"
+        fr"(?:by\s+)?(?P<pct>{number})(?:\s*%|\s+percent\b)",
+        flags=re.IGNORECASE,
+    )
+    changes = list(change_pattern.finditer(tail))
+    percent_count = len(re.findall(r"(?:%|\bpercent\b)", tail, flags=re.IGNORECASE))
+    if len(changes) < 2 or len(changes) != percent_count:
+        return None
+    percent_spans = [change.span("pct") for change in changes]
+    for number_match in re.finditer(number, tail):
+        if not any(
+            number_match.start() >= start and number_match.end() <= end
+            for start, end in percent_spans
+        ):
+            return None
+    if not re.search(r"\b(?:then|after(?:wards)?|followed by|and)\b", tail, re.I):
+        return None
+
+    value = Fraction(initial_match.group("value"))
+    for change in changes:
+        pct = Fraction(change.group("pct"))
+        verb = change.group("verb").lower()
+        increasing = verb.startswith(("increase", "rise", "grow"))
+        if pct < 0 or (not increasing and pct > 100):
+            return None
+        value *= 1 + pct / 100 if increasing else 1 - pct / 100
+    return LocalAnswer(_format_number(value), 0.99, "sequential_percent_changes")
+
+
+def _solve_average_speed(text: str) -> LocalAnswer | None:
+    if not re.search(r"\baverage\s+speed\b", text, re.I):
+        return None
+    if re.search(r"\b(?:rests?|stops?|waits?|layovers?|breaks?)\b", text, re.I):
+        return None
+    number = r"\d+(?:\.\d+)?"
+    leg_pattern = re.compile(
+        fr"\b(?:(?:travels?|covers?|goes?)\s+)?(?P<distance>{number})\s*"
+        r"(?P<distance_unit>km|kilometers?|kilometres?|mi|miles?)\s+"
+        r"(?:at|with\s+(?:a\s+)?speed\s+of)\s+"
+        fr"(?P<speed>{number})\s*"
+        r"(?P<speed_unit>km/h|kph|kilometers?\s+per\s+hour|"
+        r"kilometres?\s+per\s+hour|mph|miles?\s+per\s+hour)\b",
+        flags=re.IGNORECASE,
+    )
+    legs = list(leg_pattern.finditer(text))
+    speed_mentions = len(
+        re.findall(
+            r"\b(?:km/h|kph|kilometers?\s+per\s+hour|kilometres?\s+per\s+hour|"
+            r"mph|miles?\s+per\s+hour)\b",
+            text,
+            re.I,
+        )
+    )
+    if len(legs) < 2 or len(legs) != speed_mentions:
+        return None
+
+    unit_family: str | None = None
+    total_distance = Fraction(0)
+    total_time = Fraction(0)
+    for leg in legs:
+        distance = Fraction(leg.group("distance"))
+        speed = Fraction(leg.group("speed"))
+        if distance < 0 or speed <= 0:
+            return None
+        distance_unit = leg.group("distance_unit").lower()
+        speed_unit = leg.group("speed_unit").lower()
+        family = "metric" if distance_unit.startswith(("km", "kilo")) else "imperial"
+        speed_family = "metric" if speed_unit.startswith(("km", "kilo")) else "imperial"
+        if family != speed_family or (unit_family is not None and family != unit_family):
+            return None
+        unit_family = family
+        total_distance += distance
+        total_time += distance / speed
+    if total_time == 0:
+        return None
+    unit = "km/h" if unit_family == "metric" else "mph"
+    return LocalAnswer(
+        f"{_format_number(total_distance / total_time)} {unit}",
+        0.99,
+        "weighted_average_speed",
+    )
+
+
+def _solve_ratio_share(text: str) -> LocalAnswer | None:
+    ratio_patterns = (
+        re.compile(
+            r"\b(?P<first>[A-Za-z][A-Za-z'-]*)\s+and\s+"
+            r"(?P<second>[A-Za-z][A-Za-z'-]*)"
+            r"(?:\s+[A-Za-z][A-Za-z'-]*){0,3}\s+are\s+in\s+(?:a\s+)?"
+            r"(?P<a>\d+)\s*:\s*(?P<b>\d+)\s+ratio\b",
+            flags=re.IGNORECASE,
+        ),
+        re.compile(
+            r"\bratio\s+of\s+(?P<first>[A-Za-z][A-Za-z'-]*)\s+to\s+"
+            r"(?P<second>[A-Za-z][A-Za-z'-]*)\s+is\s+"
+            r"(?P<a>\d+)\s*:\s*(?P<b>\d+)\b",
+            flags=re.IGNORECASE,
+        ),
+    )
+    ratio = next(
+        (match for pattern in ratio_patterns if (match := pattern.search(text)) is not None),
+        None,
+    )
+    if ratio is None:
+        return None
+
+    tail = text[ratio.end() :]
+    if len(re.findall(r"\d+(?:\.\d+)?", tail)) != 1:
+        return None
+    total_match = re.search(
+        r"\b(?:there\s+are|total(?:\s+of)?|altogether(?:\s+are|\s+is)?)\s+"
+        r"(?P<total>\d+(?:\.\d+)?)\b",
+        tail,
+        flags=re.IGNORECASE,
+    ) or re.search(
+        r"\b(?P<total>\d+(?:\.\d+)?)\s+(?:[A-Za-z][A-Za-z'-]*\s+){0,3}"
+        r"(?:in\s+)?total\b",
+        tail,
+        flags=re.IGNORECASE,
+    )
+    question = re.search(r"\bhow\s+many\b(?P<body>[^?]*)", tail, flags=re.IGNORECASE)
+    if total_match is None or question is None:
+        return None
+
+    labels = (ratio.group("first"), ratio.group("second"))
+    mentioned = [
+        index
+        for index, label in enumerate(labels)
+        if re.search(fr"\b{re.escape(label)}\b", question.group("body"), re.I)
+    ]
+    if len(mentioned) != 1:
+        return None
+    parts = (int(ratio.group("a")), int(ratio.group("b")))
+    if parts[0] <= 0 or parts[1] <= 0:
+        return None
+    total = Fraction(total_match.group("total"))
+    result = total * parts[mentioned[0]] / sum(parts)
+    return LocalAnswer(_format_number(result), 0.99, "ratio_share")
 
 
 def _solve_percent(text: str) -> LocalAnswer | None:

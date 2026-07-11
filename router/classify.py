@@ -153,8 +153,18 @@ def _looks_like_logic(lower: str) -> bool:
         "different job",
         "different color",
         "different day",
+        "order from left to right",
+        "order from first to last",
     )
     if any(signal in lower for signal in signals):
+        return True
+    if re.search(r"\bif\b[^.;]{3,100}(?:\bthen\b|,)[^.;]+[.;]", lower) and re.search(
+        r"\b(?:can|does|is|are|must|could)\b[^?]*\?", lower
+    ):
+        return True
+    if re.search(r"\ball\b[^.]+\.[^.]+\b(?:is|are)\b[^.]+\.", lower) and re.search(
+        r"\b(?:does|is|are|can)\b[^?]*\?", lower
+    ):
         return True
     return bool(
         re.search(r"\beach\b.{0,100}\bdifferent\b", lower, flags=re.S)

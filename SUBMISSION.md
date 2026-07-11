@@ -11,21 +11,21 @@
   code debugging.
 - Fireworks fallback implemented with `FIREWORKS_API_KEY`, `FIREWORKS_BASE_URL`, and
   `ALLOWED_MODELS`.
-- Unit validation passes: `33/33`.
-- Offline baseline, official, held-out, and reasoning fixtures pass: `8/8`, `8/8`, `16/16`,
-  and `8/8`.
-- Final official-practice Docker run passes `8/8`, with Fireworks on `3/8` tasks and local
+- Unit validation passes: `39/39`.
+- Offline baseline, official, held-out, local-champion, and reasoning fixtures pass: `8/8`,
+  `8/8`, `16/16`, `12/12`, and `8/8`.
+- Final official-practice live run passes `8/8`, with Fireworks on `3/8` tasks and local
   solvers on `5/8`.
-- Latest final official Docker token total: `446` (`149` factual + `210` summary + `87` code;
-  `444-446` observed across final runs).
-- Final all-model reasoning stress run passes `8/8` at `1,497` tokens.
+- Latest final official live token total: `251` across three calls.
+- Final held-out live suite passes `16/16` at `483` tokens.
+- Final reasoning-stress Docker run passes `8/8` at `262` tokens, with six local answers.
 - Docker build passes for `linux/amd64`.
-- Current final image: `budgetbrain-track1:champion`, `linux/amd64`, `45,522,179` bytes by
-  Docker's image content-size field.
+- Current final image: `budgetbrain-track1:champion-v2`, `linux/amd64`, `45,525,751` bytes
+  by Docker's image content-size field.
 - Public submission image:
-  `lebinbin/budgetbrain-track1:amd-act2-20260710`.
+  `lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2`.
 - Public image digest:
-  `sha256:bb74ac8bf2d2c089a236f578ef82e10e0a9316430fc8f2293bf23468badfedc6`.
+  `sha256:c287fee3ea4cc8d631c35734cef6ca315147ee7ee1a3ea22b87fa97bc0bdeb2a`.
 - Anonymous `linux/amd64` manifest access and pull both pass from an empty Docker config.
 - Official accuracy gate: `80%`.
 - Real eval has `19` tasks, so target is at least `16/19` correct.
