@@ -58,7 +58,8 @@ docker run --rm \
 Current verified local image:
 
 ```bash
-docker buildx build --platform linux/amd64 -t budgetbrain-track1:local --load .
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+  -t budgetbrain-track1:local --load .
 docker run --rm --platform linux/amd64 \
   --env-file .env \
   -v "$PWD/tests/sample_inputs:/input:ro" \
@@ -66,29 +67,38 @@ docker run --rm --platform linux/amd64 \
   budgetbrain-track1:local
 ```
 
-The latest local candidate is `budgetbrain-track1:champion-v3`, is `linux/amd64`, and has
-Docker content size `45,527,782` bytes. V3 validation produced `8/8` official answers at
-256 tokens, `16/16` held-out answers at 362 tokens (`366` inside Docker), and `8/8`
-reasoning-stress answers at 262 tokens. The public v2 remains the submission image until v3
-receives a new immutable tag.
+The latest release candidate is `budgetbrain-track1:champion-v3-plain`, is a single
+`linux/amd64` manifest, and has Docker content size `45,527,752` bytes. V3 validation produced
+`8/8` official answers at 256 tokens, `16/16` held-out answers at 362 tokens (`366` inside
+Docker), and `8/8` reasoning-stress answers at 262 tokens. It also passes `47/47` unit tests
+plus adversarial classifier, sentiment-negation, and ambiguous-NER checks.
 
 Published immutable public submission image:
 
 ```text
 lebinbin/budgetbrain-track1:amd-act2-20260710
 lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2
+docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v3
 ```
 
-The first tag is the previous submission image. Use the optimized `20260711-champion-v2`
-tag for scoring; its public `linux/amd64` manifest and anonymous pull are verified.
-Optimized published digest:
+The v2 tag is anonymously accessible, but its registry entry contains an extra provenance
+manifest and the evaluator reported `PULL_ERROR`; do not resubmit that tag. Use the verified
+single-manifest replacement:
 
 ```text
-sha256:c287fee3ea4cc8d631c35734cef6ca315147ee7ee1a3ea22b87fa97bc0bdeb2a
+docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v3
+```
+
+The replacement passes anonymous manifest inspection and an anonymous `linux/amd64` pull.
+Published replacement digest:
+
+```text
+sha256:ee7501852fe13c8bc8711f870d37871ee6d52a86b7074b38722ea10bf9c3e68a
 ```
 
 Anonymous verification:
 
 ```bash
-docker pull --platform linux/amd64 lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2
+docker pull --platform linux/amd64 \
+  docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v3
 ```

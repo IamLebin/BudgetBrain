@@ -108,6 +108,8 @@ NEGATORS = {
     "shouldn't",
 }
 
+NEGATION_BOUNDARIES = {".", "!", "?", ";", ",", "but", "however", "although", "yet"}
+
 
 def solve_sentiment(prompt: str) -> LocalAnswer | None:
     if re.search(r"\b(justify|explain|give (?:a )?reason|why)\b", prompt, re.I):
@@ -119,7 +121,7 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
         for cue in ("yeah right", "as if", "just great", "thanks a lot", "what a surprise", "/s")
     ):
         return None
-    tokens = re.findall(r"[a-z']+", text.lower())
+    tokens = re.findall(r"[a-z']+|[.!?;,]", text.lower())
     if not tokens:
         return None
     positive_hits = 0
@@ -139,14 +141,19 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
             return LocalAnswer("neutral", 0.92, "factual_neutral")
         return LocalAnswer("neutral", 0.72, "lexicon")
     if positive_hits and negative_hits:
-        constrained_three_way = bool(
-            re.search(
-                r"positive\s*,?\s*negative\s*,?\s*(?:or|and)\s*neutral",
-                prompt,
-                re.I,
+        allowed_labels = set(
+            re.findall(
+                r"\b(?:positive|negative|neutral|mixed)\b",
+                prompt.split(":", maxsplit=1)[0].lower(),
             )
         )
-        label = "neutral" if constrained_three_way else "mixed"
+        if allowed_labels and "mixed" not in allowed_labels:
+            if {"positive", "negative", "neutral"} <= allowed_labels:
+                label = "neutral"
+            else:
+                return None
+        else:
+            label = "mixed"
         return LocalAnswer(label, min(0.95, 0.84 + hits * 0.03), "mixed_lexicon")
     if positive_hits:
         return LocalAnswer("positive", min(0.96, 0.72 + hits * 0.1), "lexicon")
@@ -156,11 +163,17 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
 
 
 def _is_negated(tokens: list[str], index: int) -> bool:
-    start = max(0, index - 4)
-    for negator_index in range(start, index):
-        if tokens[negator_index] not in NEGATORS:
+    words_seen = 0
+    for negator_index in range(index - 1, -1, -1):
+        token = tokens[negator_index]
+        if token in NEGATION_BOUNDARIES:
+            break
+        words_seen += 1
+        if words_seen > 4:
+            break
+        if token not in NEGATORS:
             continue
-        if tokens[negator_index] == "not" and negator_index + 1 < index:
+        if token == "not" and negator_index + 1 < index:
             if tokens[negator_index + 1] == "only":
                 continue
         return True

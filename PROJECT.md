@@ -96,7 +96,13 @@ contract above and avoid hardcoded/cached answers.
   solved locally and only two model calls.
 - Our v3 held-out Docker run: `16/16` at `366` Fireworks tokens, with eleven tasks
   solved locally and five model calls.
-- Optimized public image: `lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2`.
+- Last public image: `lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2`; the evaluator
+  reported `PULL_ERROR` before scoring it.
+- Published replacement: `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v3`,
+  built as a single `linux/amd64` manifest without provenance/SBOM attachments and verified by
+  anonymous remote manifest inspection and pull.
+- Replacement digest:
+  `sha256:ee7501852fe13c8bc8711f870d37871ee6d52a86b7074b38722ea10bf9c3e68a`.
 
 Leaderboard values can move before the deadline; the implementation target is therefore
 `>=18/19` accuracy and comfortably below `1,797` tokens, not merely clearing the gate.

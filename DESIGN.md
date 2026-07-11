@@ -107,7 +107,7 @@ become your evidence log, not just a plan.
    local accuracy bar.
 
 ## Current validation snapshot
-- Unit tests: `44/44` passing.
+- Unit tests: `47/47` passing.
 - Offline fixtures: baseline `8/8`, official practice `8/8`, held-out `16/16`, local champion
   `17/17` with zero model calls, and reasoning stress `8/8` with two model calls.
 - V3 live official-practice run: `8/8`, three Fireworks calls, `256` tokens.
@@ -125,8 +125,14 @@ become your evidence log, not just a plan.
   requested NER JSON before accepting them; invalid outputs fall back to the next allowed model.
 - Live Fireworks validation works after normalizing shorthand model names to full Fireworks
   model IDs such as `accounts/fireworks/models/minimax-m3`.
-- Docker image `budgetbrain-track1:champion-v3` builds and runs as `linux/amd64`; Docker content
-  size is `45,527,782` bytes, comfortably under the `10GB` compressed-size limit.
+- Docker image `budgetbrain-track1:champion-v3-plain` builds and runs as a single
+  `linux/amd64` manifest; Docker content size is `45,527,752` bytes, comfortably under the
+  `10GB` compressed-size limit.
+- Public v3 manifest inspection and an empty-config anonymous pull pass at digest
+  `sha256:ee7501852fe13c8bc8711f870d37871ee6d52a86b7074b38722ea10bf9c3e68a`.
+- Adversarial routing tests prevent broad phrases from misclassifying factual, math, grammar,
+  and non-sentiment classification prompts. Sentiment negation stops at sentence/contrast
+  boundaries, and ambiguous capitalized NER spans fall back to Fireworks instead of guessing.
 - Grading environment: `4 GB RAM`, `2 vCPU`.
 - Failure statuses from the updated guide to watch for: `PULL_ERROR`, `RUNTIME_ERROR`,
   `TIMEOUT`, `INVALID_RESULTS_SCHEMA`, `MODEL_VIOLATION`, `IMAGE_TOO_LARGE`,

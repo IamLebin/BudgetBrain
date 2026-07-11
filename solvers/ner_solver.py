@@ -50,6 +50,7 @@ GEOGRAPHIC_NAMES = {
     "Hong Kong",
     "Kuala Lumpur",
     "Los Angeles",
+    "New Delhi",
     "New York",
     "New Zealand",
     "North Korea",
@@ -122,6 +123,32 @@ LOCATION_PREPOSITIONS = {
     "to",
     "toward",
     "towards",
+}
+
+PERSON_PRECEDING_VERBS = {
+    "appointed",
+    "called",
+    "contacted",
+    "hired",
+    "invited",
+    "met",
+    "named",
+    "thanked",
+}
+
+PERSON_FOLLOWING_VERBS = {
+    "announced",
+    "became",
+    "climbed",
+    "founded",
+    "joined",
+    "met",
+    "said",
+    "spoke",
+    "traveled",
+    "travelled",
+    "visited",
+    "works",
 }
 
 MONTHS = {
@@ -252,7 +279,7 @@ def _extract_entities(text: str) -> tuple[list[dict[str, str]], bool]:
         words = value.split()
         if value in SKIP_CAPITALIZED or words[0] in MONTHS or words[0] in DATE_RELATIVES:
             continue
-        label = _label_name(text, match.start(), value)
+        label = _label_name(text, match.start(), match.end(), value)
         if label is None:
             unresolved = True
             continue
@@ -260,10 +287,12 @@ def _extract_entities(text: str) -> tuple[list[dict[str, str]], bool]:
     return entities, unresolved
 
 
-def _label_name(source: str, start: int, value: str) -> str | None:
+def _label_name(source: str, start: int, end: int, value: str) -> str | None:
     words = value.split()
     previous = re.findall(r"\b[A-Za-z]+\b", source[:start])
     previous_word = previous[-1].lower() if previous else ""
+    following = re.findall(r"\b[A-Za-z]+\b", source[end:])
+    following_word = following[0].lower() if following else ""
     if previous_word in LOCATION_PREPOSITIONS:
         return "LOCATION"
     if value in GEOGRAPHIC_NAMES:
@@ -272,7 +301,9 @@ def _label_name(source: str, start: int, value: str) -> str | None:
         return "ORG"
     if words[0] in LOCATION_PREFIXES or words[-1] in LOCATION_SUFFIXES:
         return "LOCATION"
-    if len(words) >= 2:
+    if len(words) >= 2 and (
+        previous_word in PERSON_PRECEDING_VERBS or following_word in PERSON_FOLLOWING_VERBS
+    ):
         return "PERSON"
     return None
 

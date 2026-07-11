@@ -171,6 +171,25 @@ class LocalSolverTests(unittest.TestCase):
             "negative",
         )
 
+    def test_sentiment_negation_boundaries_and_allowed_labels(self) -> None:
+        separated = solve_sentiment(
+            "Classify as positive, negative, or neutral: Not fast. It is reliable."
+        )
+        self.assertIsNotNone(separated)
+        self.assertEqual(separated.answer, "neutral")
+
+        reordered = solve_sentiment(
+            "Classify as negative, neutral, or positive: "
+            "The battery is great, but the app crashes."
+        )
+        self.assertIsNotNone(reordered)
+        self.assertEqual(reordered.answer, "neutral")
+
+        binary = solve_sentiment(
+            "Classify as positive or negative: The battery is great, but the app crashes."
+        )
+        self.assertIsNone(binary)
+
     def test_short_bullet_summary_is_local_only_when_structure_is_safe(self) -> None:
         solved = solve_summarization(
             "Summarize this update in two bullet points: "
@@ -230,6 +249,20 @@ class LocalSolverTests(unittest.TestCase):
         entities = json.loads(solved.answer)
         self.assertIn({"text": "Mount Everest", "label": "LOCATION"}, entities)
         self.assertIn({"text": "European Union", "label": "ORG"}, entities)
+
+    def test_ner_ambiguous_capitals_fall_back_instead_of_guessing_person(self) -> None:
+        location = solve_ner(
+            "Extract named entities and types from: Alice Johnson visited New Delhi."
+        )
+        self.assertIsNotNone(location)
+        entities = json.loads(location.answer)
+        self.assertIn({"text": "Alice Johnson", "label": "PERSON"}, entities)
+        self.assertIn({"text": "New Delhi", "label": "LOCATION"}, entities)
+
+        ambiguous = solve_ner(
+            "Extract named entities and types from: Cedar Grove hosted the summit."
+        )
+        self.assertIsNone(ambiguous)
 
     def test_logic_exactly_one_truth(self) -> None:
         solved = solve_logic(
@@ -355,6 +388,23 @@ class LocalSolverTests(unittest.TestCase):
         self.assertEqual(
             classify_prompt("How should a company implement ISO 27001 controls?").category,
             "factual_qa",
+        )
+
+    def test_classifier_avoids_broad_instruction_false_positives(self) -> None:
+        cases = {
+            "What is the overall time complexity of binary search?": "factual_qa",
+            "Classify the following triangle by its side lengths: 3, 3, 5.": "factual_qa",
+            "Can you determine how many apples remain after selling 12?": "math",
+            "What can you infer from the HTTP 404 response?": "factual_qa",
+            "Fix this sentence for grammar: She go to school.": "factual_qa",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(classify_prompt(prompt).category, expected)
+
+        self.assertEqual(
+            classify_prompt("Fix this Python function; it returns wrong output.").category,
+            "code_debugging",
         )
 
     def test_fireworks_model_selection_prefers_code_model(self) -> None:

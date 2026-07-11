@@ -98,6 +98,9 @@ fails, using a short error-safe fallback answer rather than crashing the entire 
 - Current implementation has no third-party Python dependencies, keeping the image small.
 - The final Dockerfile performs no package-install step, so builds do not depend on a package
   index and the runtime image stays near `45.5 MB` by Docker's content-size measurement.
+- Release builds use `--provenance=false --sbom=false` so the registry tag resolves to one
+  `linux/amd64` image manifest rather than an OCI index with an `unknown/unknown` attestation
+  child that strict evaluation pullers may reject.
 - Grading resources are 4 GB RAM and 2 vCPU, so any local model strategy must fit comfortably
   inside that budget. The current implementation uses rule-based local solvers instead of
   bundled local LLM weights.
