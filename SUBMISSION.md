@@ -11,7 +11,7 @@
   code debugging.
 - Fireworks fallback implemented with `FIREWORKS_API_KEY`, `FIREWORKS_BASE_URL`, and
   `ALLOWED_MODELS`.
-- Unit validation passes: `44/44`.
+- Unit validation passes: `47/47`.
 - Offline baseline, official, held-out, local-champion, and reasoning fixtures pass: `8/8`,
   `8/8`, `16/16`, `17/17`, and `8/8`.
 - Final official-practice live run passes `8/8`, with Fireworks on `3/8` tasks and local
@@ -20,13 +20,16 @@
 - V3 held-out live suite passes `16/16` at `362` tokens; the Docker run uses `366` tokens.
 - Final reasoning-stress Docker run passes `8/8` at `262` tokens, with six local answers.
 - Docker build passes for `linux/amd64`.
-- Current v3 local candidate: `budgetbrain-track1:champion-v3`, `linux/amd64`, `45,527,782`
-  bytes by Docker's image content-size field.
+- Current v3 release candidate: `budgetbrain-track1:champion-v3-plain`, single
+  `linux/amd64` manifest, `45,527,752` bytes by Docker's image content-size field.
 - Public submission image:
-  `lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2`.
+  `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v3`.
 - Public image digest:
-  `sha256:c287fee3ea4cc8d631c35734cef6ca315147ee7ee1a3ea22b87fa97bc0bdeb2a`.
-- Anonymous `linux/amd64` manifest access and pull both pass from an empty Docker config.
+  `sha256:ee7501852fe13c8bc8711f870d37871ee6d52a86b7074b38722ea10bf9c3e68a`.
+- The prior v2 tag is public, but its OCI index includes an `unknown/unknown` provenance child;
+  the evaluator reported `PULL_ERROR` before any accuracy score was produced.
+- V3 is rebuilt with provenance and SBOM disabled. Empty-config anonymous manifest inspection
+  and `linux/amd64` pull both pass.
 - Official accuracy gate: `80%`.
 - Real eval has `19` tasks, so target is at least `16/19` correct.
 - Grading environment: `4 GB RAM`, `2 vCPU`.
@@ -40,9 +43,8 @@
   official 10-minute runtime limit.
 
 ## Still Required Before Real Submission
-- Push v3 under a new immutable public tag and verify anonymous pull.
-- Enter the immutable image reference in the Track 1 submission form; do not use a mutable
-  local-only tag.
+- Enter this exact full image reference in the Track 1 submission form:
+  `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v3`.
 - Watch for failure statuses in the updated guide:
   `PULL_ERROR`, `RUNTIME_ERROR`, `TIMEOUT`, `INVALID_RESULTS_SCHEMA`, `MODEL_VIOLATION`,
   `IMAGE_TOO_LARGE`, `ACCURACY_GATE_FAILED`.

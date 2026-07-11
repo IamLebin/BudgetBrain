@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/solve.py": {
+      "maxDuration": 30
+    }
+  },
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/api/solve", "dest": "/api/solve.py" }
+  ]
+}

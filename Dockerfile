@@ -9,5 +9,10 @@ COPY app app
 COPY fireworks fireworks
 COPY router router
 COPY solvers solvers
+COPY api api
+COPY index.html index.html
+COPY server.py server.py
 
-CMD ["python", "-m", "app.main"]
+EXPOSE 8000
+
+CMD ["python", "server.py"]

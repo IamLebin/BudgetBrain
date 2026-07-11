@@ -18,12 +18,12 @@ def classify_prompt(prompt: str) -> Classification:
         return Classification("code_debugging", 0.94)
     if _looks_like_code_generation(lower):
         return Classification("code_generation", 0.93)
-    if _looks_like_summarization(lower, text):
-        return Classification("summarization", 0.94)
     if _looks_like_ner(lower):
         return Classification("ner", 0.94)
     if _looks_like_sentiment(lower):
         return Classification("sentiment", 0.93)
+    if _looks_like_summarization(lower, text):
+        return Classification("summarization", 0.94)
     if _looks_like_logic(lower):
         return Classification("logic", 0.89)
     if _looks_like_math(lower):
@@ -38,16 +38,22 @@ def _looks_like_code_generation(lower: str) -> bool:
         "write a program",
         "write code",
         "write an sql",
+        "write a sql",
         "create a script",
         "create a function",
         "define a function",
         "generate code",
         "return code",
+        "code that",
+        "give me code",
+        "give me a function",
+        "design a function",
+        "design a class",
     )
     return any(signal in lower for signal in signals) or bool(
         re.search(
-            r"\b(write|create|implement|define|generate)\b.{0,60}"
-            r"\b(function|method|class|program|script|query|algorithm)\b",
+            r"\b(write|create|implement|define|generate|design|build|develop)\b.{0,60}"
+            r"\b(function|method|class|program|script|query|algorithm|routine|procedure)\b",
             lower,
         )
     )
@@ -64,39 +70,78 @@ def _looks_like_code_debugging(text: str, lower: str) -> bool:
         "attributeerror",
         "nameerror",
         "nullpointerexception",
+        "runtimeerror",
+        "zerodivisionerror",
+        "overflowerror",
+        "filenotfounderror",
+        "importerror",
+        "recursionerror",
     )
     if any(error in lower for error in runtime_errors):
         return True
     if "syntax issue" in lower or "syntax error" in lower:
         return True
-    signals = (
+    strong_signals = (
         "debug",
         "fix the bug",
-        "find and fix",
         "has a bug",
         "contains a bug",
         "correct the code",
         "corrected implementation",
+        "why does this code",
+    )
+    if any(signal in lower for signal in strong_signals):
+        return True
+
+    contextual_signals = (
+        "find and fix",
         "incorrect output",
         "wrong output",
         "doesn't work",
         "does not work",
-        "why does this code",
+        "what's wrong",
+        "what is wrong",
+        "unexpected behavior",
+        "unexpected behaviour",
+        "unexpected result",
+        "fix this",
+        "repair",
+        "behaves unexpectedly",
+        "produces wrong",
+        "gives wrong",
+        "returns wrong",
     )
-    if any(signal in lower for signal in signals):
+    code_context = "```" in text or bool(
+        re.search(
+            r"\b(?:code|function|method|class|program|script|algorithm|query|"
+            r"python|javascript|typescript|java|sql|c\+\+|rust|traceback)\b",
+            lower,
+        )
+    )
+    if code_context and any(signal in lower for signal in contextual_signals):
         return True
     return "```" in text and any(
-        word in lower for word in ("error", "bug", "wrong", "fix", "issue", "correct")
+        word in lower for word in ("error", "bug", "wrong", "fix", "issue", "correct", "broken", "fails")
     )
 
 
 def _looks_like_summarization(lower: str, text: str) -> bool:
-    if any(
+    explicit = any(
         word in lower
-        for word in ("summarize", "summarise", "summary", "tl;dr", "tldr", "condense")
+        for word in (
+            "summarize", "summarise", "summary", "tl;dr", "tldr", "condense",
+            "brief overview", "key points", "main points", "main idea",
+            "give the gist", "in a nutshell",
+        )
+    )
+    if explicit:
+        return True
+    if re.search(
+        r"\b(?:in|into)\s+(?:one|two|three|four|five|[1-5])\s+(?:bullet\s+points?|sentences?)\b",
+        lower,
     ):
         return True
-    return len(text.split()) > 140 and "?" not in text[:120]
+    return False
 
 
 def _looks_like_ner(lower: str) -> bool:
@@ -116,6 +161,13 @@ def _looks_like_ner(lower: str) -> bool:
         "persons, organizations",
         "person, org",
         "person, organization",
+        "list all entities",
+        "tag the entities",
+        "recognize entities",
+        "what are the entities",
+        "extract all named",
+        "identify all named",
+        "entities and types",
     )
     return any(signal in lower for signal in signals)
 
@@ -124,34 +176,55 @@ def _looks_like_sentiment(lower: str) -> bool:
     signals = (
         "sentiment",
         "positive, negative, or neutral",
+        "positive, negative, neutral",
         "positive negative neutral",
         "positive or negative",
         "opinion polarity",
         "classify the review",
         "classify this review",
         "is this review positive",
+        "tone of",
+        "what is the tone",
     )
-    return any(signal in lower for signal in signals)
+    if any(signal in lower for signal in signals):
+        return True
+    return bool(
+        re.search(
+            r"\bclassify\b.{0,40}\b(?:as|into)\b.{0,30}"
+            r"\b(?:positive|negative|neutral)\b",
+            lower,
+        )
+    )
 
 
 def _looks_like_logic(lower: str) -> bool:
     signals = (
         "logic puzzle",
+        "logical puzzle",
+        "reasoning puzzle",
         "exactly one",
         "exactly two",
+        "only one statement",
         "at least one",
         "who is lying",
         "truth teller",
+        "telling the truth",
         "knights and knaves",
         "if and only if",
         "who owns the",
         "which person",
         "logical deduction",
+        "logically deduce",
         "can we conclude",
+        "what can you conclude",
+        "what can we conclude",
+        "what must be true",
         "does it follow",
+        "can you deduce",
         "different pet",
         "different job",
         "different color",
+        "different colour",
         "different day",
         "order from left to right",
         "order from first to last",
@@ -199,6 +272,14 @@ def _looks_like_math(lower: str) -> bool:
         "remain",
         "projection",
         "per year",
+        "what is the value",
+        "find the value",
+        "determine the result",
+        "total cost",
+        "total price",
+        "sale price",
+        "final price",
+        "net pay",
     )
     has_number = bool(
         re.search(r"\d", lower)

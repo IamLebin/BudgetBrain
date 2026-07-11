@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 import sys
 
 from fireworks.client import FireworksClient, FireworksError
@@ -29,6 +30,16 @@ LOCAL_SOLVERS = {
     "code_debugging": solve_code_debug,
 }
 
+# These categories are semantic enough that a plausible rule-based answer can still miss the
+# LLM judge's intended meaning. Keep their solvers for emergency fallback and unit testing, but
+# use Fireworks during normal scoring.
+REMOTE_FIRST_CATEGORIES = {"sentiment", "summarization", "ner", "code_debugging"}
+
+LOCAL_MIN_CONFIDENCE = {
+    "math": 0.9,
+    "logic": 0.97,
+}
+
 
 def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveResult:
     classification = classify_prompt(prompt)
@@ -36,7 +47,7 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
 
     if solver is not None:
         local = solver(prompt)
-        if local is not None and local.confidence >= 0.82 and local.answer.strip():
+        if local is not None and _can_use_local(prompt, classification.category, local.confidence):
             return SolveResult(
                 answer=local.answer.strip(),
                 category=classification.category,
@@ -61,6 +72,21 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
             category=classification.category,
             source="fallback",
         )
+
+
+def _can_use_local(prompt: str, category: str, confidence: float) -> bool:
+    if category in REMOTE_FIRST_CATEGORIES:
+        return False
+    if confidence < LOCAL_MIN_CONFIDENCE.get(category, 1.0):
+        return False
+    if category in {"math", "logic"} and re.search(
+        r"\b(?:explain|explanation|justify|reasoning|derive|step[- ]by[- ]step|"
+        r"show\s+(?:your\s+)?(?:work|steps?))\b",
+        prompt,
+        re.I,
+    ):
+        return False
+    return True
 
 
 def _last_resort_answer(prompt: str, category: str) -> str:

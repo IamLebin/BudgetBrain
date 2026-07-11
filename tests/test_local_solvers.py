@@ -171,6 +171,25 @@ class LocalSolverTests(unittest.TestCase):
             "negative",
         )
 
+    def test_sentiment_negation_boundaries_and_allowed_labels(self) -> None:
+        separated = solve_sentiment(
+            "Classify as positive, negative, or neutral: Not fast. It is reliable."
+        )
+        self.assertIsNotNone(separated)
+        self.assertEqual(separated.answer, "neutral")
+
+        reordered = solve_sentiment(
+            "Classify as negative, neutral, or positive: "
+            "The battery is great, but the app crashes."
+        )
+        self.assertIsNotNone(reordered)
+        self.assertEqual(reordered.answer, "neutral")
+
+        binary = solve_sentiment(
+            "Classify as positive or negative: The battery is great, but the app crashes."
+        )
+        self.assertIsNone(binary)
+
     def test_short_bullet_summary_is_local_only_when_structure_is_safe(self) -> None:
         solved = solve_summarization(
             "Summarize this update in two bullet points: "
@@ -230,6 +249,20 @@ class LocalSolverTests(unittest.TestCase):
         entities = json.loads(solved.answer)
         self.assertIn({"text": "Mount Everest", "label": "LOCATION"}, entities)
         self.assertIn({"text": "European Union", "label": "ORG"}, entities)
+
+    def test_ner_ambiguous_capitals_fall_back_instead_of_guessing_person(self) -> None:
+        location = solve_ner(
+            "Extract named entities and types from: Alice Johnson visited New Delhi."
+        )
+        self.assertIsNotNone(location)
+        entities = json.loads(location.answer)
+        self.assertIn({"text": "Alice Johnson", "label": "PERSON"}, entities)
+        self.assertIn({"text": "New Delhi", "label": "LOCATION"}, entities)
+
+        ambiguous = solve_ner(
+            "Extract named entities and types from: Cedar Grove hosted the summit."
+        )
+        self.assertIsNone(ambiguous)
 
     def test_logic_exactly_one_truth(self) -> None:
         solved = solve_logic(
@@ -357,6 +390,23 @@ class LocalSolverTests(unittest.TestCase):
             "factual_qa",
         )
 
+    def test_classifier_avoids_broad_instruction_false_positives(self) -> None:
+        cases = {
+            "What is the overall time complexity of binary search?": "factual_qa",
+            "Classify the following triangle by its side lengths: 3, 3, 5.": "factual_qa",
+            "Can you determine how many apples remain after selling 12?": "math",
+            "What can you infer from the HTTP 404 response?": "factual_qa",
+            "Fix this sentence for grammar: She go to school.": "factual_qa",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(classify_prompt(prompt).category, expected)
+
+        self.assertEqual(
+            classify_prompt("Fix this Python function; it returns wrong output.").category,
+            "code_debugging",
+        )
+
     def test_fireworks_model_selection_prefers_code_model(self) -> None:
         client = FireworksClient(
             api_key="test",
@@ -428,6 +478,10 @@ class LocalSolverTests(unittest.TestCase):
             clean_model_answer("```python\ndef square(n):\n    return n * n\n```", "code_generation"),
             "def square(n):\n    return n * n",
         )
+        self.assertEqual(
+            clean_model_answer('```json\n[{"entity":"Ada","type":"PERSON"}]\n```', "ner"),
+            '[{"entity":"Ada","type":"PERSON"}]',
+        )
 
     def test_short_classification_answers_are_normalized(self) -> None:
         self.assertEqual(
@@ -493,6 +547,38 @@ class LocalSolverTests(unittest.TestCase):
         self.assertEqual(solved.source, "fireworks")
         self.assertEqual(solved.answer, "Tokyo")
 
+    def test_accuracy_first_routes_semantic_categories_to_fireworks(self) -> None:
+        prompts = {
+            'Classify the sentiment: "This is excellent."': "positive",
+            "Summarize in one sentence: The release is stable and fast.": "The release is stable and fast.",
+            "Extract named entities from: Maya Chen visited Paris.": "Maya Chen PERSON Paris LOCATION",
+            "This Python function has a bug: def top(xs): return xs[0]. Fix it.": "def top(xs):\n    return max(xs)",
+        }
+        client = FakeFireworksClient(prompts)
+        for prompt, expected in prompts.items():
+            with self.subTest(prompt=prompt):
+                solved = solve_prompt(prompt, client=client)
+                self.assertEqual(solved.source, "fireworks")
+                self.assertEqual(solved.answer, expected)
+
+        local_math = solve_prompt("What is 7 * (8 + 2)?", client=client)
+        self.assertEqual(local_math.source, "local:safe_eval")
+
+    def test_explanation_requests_escalate_exact_local_answers(self) -> None:
+        math_prompt = "What is 7 * (8 + 2)? Show your work."
+        logic_prompt = (
+            "All red keys open the vault. Key A is red. Does Key A open the vault? "
+            "Explain your reasoning."
+        )
+        client = FakeFireworksClient(
+            {
+                math_prompt: "7 * 10 = 70, so the answer is 70.",
+                logic_prompt: "Yes. Key A is red, and all red keys open the vault.",
+            }
+        )
+        self.assertEqual(solve_prompt(math_prompt, client=client).source, "fireworks")
+        self.assertEqual(solve_prompt(logic_prompt, client=client).source, "fireworks")
+
     def test_fireworks_retries_unavailable_model(self) -> None:
         class RetryClient(FireworksClient):
             def __init__(self) -> None:
@@ -538,6 +624,34 @@ class LocalSolverTests(unittest.TestCase):
         answer = client.solve("Write a Python function square(n).", "code_generation")
         self.assertEqual(answer, "def square(n):\n    return n * n")
         self.assertEqual(len(client.models), 2)
+
+    def test_fireworks_retries_truncated_answers(self) -> None:
+        class TruncationRetryClient(FireworksClient):
+            def __init__(self) -> None:
+                super().__init__(
+                    api_key="test",
+                    base_url="https://api.fireworks.ai/inference/v1",
+                    allowed_models=["minimax-m3", "kimi-k2p7-code"],
+                )
+                self.calls = 0
+
+            def _post_json(self, path, payload):  # type: ignore[no-untyped-def]
+                self.calls += 1
+                if self.calls == 1:
+                    return {
+                        "choices": [
+                            {"message": {"content": "Sam owns"}, "finish_reason": "length"}
+                        ]
+                    }
+                return {
+                    "choices": [
+                        {"message": {"content": "Sam owns the cat."}, "finish_reason": "stop"}
+                    ]
+                }
+
+        client = TruncationRetryClient()
+        self.assertEqual(client.solve("Who owns the cat?", "logic"), "Sam owns the cat.")
+        self.assertEqual(client.calls, 2)
 
     def test_batch_contract_preserves_order_and_writes_strings(self) -> None:
         tasks = [
