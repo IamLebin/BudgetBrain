@@ -9,7 +9,6 @@ COPY app app
 COPY fireworks fireworks
 COPY router router
 COPY solvers solvers
-COPY api api
 COPY index.html index.html
 COPY server.py server.py
 
