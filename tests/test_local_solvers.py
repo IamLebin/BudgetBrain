@@ -651,10 +651,9 @@ class LocalSolverTests(unittest.TestCase):
         self.assertEqual(solved.source, "fireworks")
         self.assertEqual(solved.answer, "Tokyo")
 
-    def test_accuracy_first_routes_semantic_categories_to_fireworks(self) -> None:
+    def test_accuracy_first_uses_only_verified_semantic_shortcuts(self) -> None:
         prompts = {
             'Classify the sentiment: "This is excellent."': "positive",
-            "Summarize in one sentence: The release is stable and fast.": "The release is stable and fast.",
             "Extract named entities from: Maya Chen visited Paris.": "Maya Chen PERSON Paris LOCATION",
             "This Python function has a bug: def top(xs): return xs[0]. Fix it.": "def top(xs):\n    return max(xs)",
         }
@@ -664,6 +663,18 @@ class LocalSolverTests(unittest.TestCase):
                 solved = solve_prompt(prompt, client=client)
                 self.assertEqual(solved.source, "fireworks")
                 self.assertEqual(solved.answer, expected)
+
+        safe_summary = solve_prompt(
+            "Summarize in one sentence: The release is stable and fast.",
+            client=client,
+        )
+        self.assertEqual(safe_summary.source, "local:already_one_sentence")
+        self.assertEqual(safe_summary.answer, "The release is stable and fast.")
+
+        complex_summary = "Summarize this report in one sentence: Revenue increased. Costs fell. Risks remain."
+        client.responses[complex_summary] = "Revenue increased and costs fell, though risks remain."
+        solved_summary = solve_prompt(complex_summary, client=client)
+        self.assertEqual(solved_summary.source, "fireworks")
 
         local_math = solve_prompt("What is 7 * (8 + 2)?", client=client)
         self.assertEqual(local_math.source, "local:safe_eval")

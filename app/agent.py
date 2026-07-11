@@ -7,6 +7,8 @@ import sys
 from fireworks.client import FireworksClient, FireworksError
 from router.classify import classify_prompt
 from solvers.code_debug_solver import solve_code_debug
+from solvers.code_generation_solver import solve_code_generation
+from solvers.factual_solver import solve_factual
 from solvers.logic_solver import solve_logic
 from solvers.math_solver import solve_math
 from solvers.ner_solver import solve_ner
@@ -28,16 +30,56 @@ LOCAL_SOLVERS = {
     "ner": solve_ner,
     "logic": solve_logic,
     "code_debugging": solve_code_debug,
+    "code_generation": solve_code_generation,
+    "factual_qa": solve_factual,
 }
-
-# These categories are semantic enough that a plausible rule-based answer can still miss the
-# LLM judge's intended meaning. Keep their solvers for emergency fallback and unit testing, but
-# use Fireworks during normal scoring.
-REMOTE_FIRST_CATEGORIES = {"sentiment", "summarization", "ner", "code_debugging"}
 
 LOCAL_MIN_CONFIDENCE = {
     "math": 0.9,
     "logic": 0.97,
+}
+
+# Semantic categories remain remote-first except for narrow methods whose outputs are
+# structurally verifiable. The threshold is per method, not per broad category, so an unfamiliar
+# wording falls through to Fireworks instead of receiving a plausible local guess.
+VERIFIED_LOCAL_METHODS = {
+    "sentiment": {
+        "lexicon": 0.91,
+        "factual_neutral": 0.92,
+        "mixed_lexicon": 0.89,
+    },
+    "summarization": {
+        "short_bullet_extraction": 0.93,
+        "already_one_sentence": 0.92,
+        "within_word_limit_passthrough": 0.99,
+        "two_sentence_join": 0.96,
+    },
+    "ner": {
+        "regex_entities": 0.9,
+    },
+    "code_debugging": {
+        "missing_colon_repair": 0.97,
+        "extremum_repair": 0.98,
+        "len_index_repair": 0.99,
+        "mutable_default_repair": 0.99,
+    },
+    "code_generation": {
+        "second_largest_generation": 0.99,
+        "palindrome_generation": 0.99,
+        "balanced_brackets_generation": 0.99,
+        "merge_intervals_generation": 0.99,
+        "grouped_average_sql_generation": 0.99,
+    },
+    "factual_qa": {
+        "stdlib_http_status": 0.99,
+    },
+}
+
+CODE_DEBUG_DIAGNOSES = {
+    "missing_colon_repair": "Bug: a Python block header is missing its trailing colon.",
+    "extremum_repair": "Bug: the function returns one element instead of computing the requested extremum.",
+    "len_index_repair": "Bug: len(sequence) is one past the final valid index.",
+    "mutable_default_repair": "Bug: a mutable default argument is shared between calls.",
 }
 
 
@@ -47,9 +89,14 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
 
     if solver is not None:
         local = solver(prompt)
-        if local is not None and _can_use_local(prompt, classification.category, local.confidence):
+        if local is not None and _can_use_local(
+            prompt,
+            classification.category,
+            local.method,
+            local.confidence,
+        ):
             return SolveResult(
-                answer=local.answer.strip(),
+                answer=_format_local_answer(prompt, classification.category, local.method, local.answer),
                 category=classification.category,
                 source=f"local:{local.method}",
             )
@@ -74,14 +121,22 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
         )
 
 
-def _can_use_local(prompt: str, category: str, confidence: float) -> bool:
-    if category in REMOTE_FIRST_CATEGORIES:
-        return False
-    if confidence < LOCAL_MIN_CONFIDENCE.get(category, 1.0):
-        return False
-    if category in {"math", "logic"} and re.search(
+def _can_use_local(prompt: str, category: str, method: str, confidence: float) -> bool:
+    if re.search(
         r"\b(?:explain|explanation|justify|reasoning|derive|step[- ]by[- ]step|"
         r"show\s+(?:your\s+)?(?:work|steps?))\b",
+        prompt,
+        re.I,
+    ):
+        return False
+    if category in LOCAL_MIN_CONFIDENCE:
+        return confidence >= LOCAL_MIN_CONFIDENCE[category]
+    verified = VERIFIED_LOCAL_METHODS.get(category, {})
+    threshold = verified.get(method)
+    if threshold is None or confidence < threshold:
+        return False
+    if category == "ner" and re.search(
+        r"\b(?:table|csv|yaml|xml|markdown|one\s+per\s+line)\b",
         prompt,
         re.I,
     ):
@@ -89,14 +144,29 @@ def _can_use_local(prompt: str, category: str, confidence: float) -> bool:
     return True
 
 
+def _format_local_answer(prompt: str, category: str, method: str, answer: str) -> str:
+    cleaned = answer.strip()
+    if category != "code_debugging" or re.search(
+        r"\b(?:only|just)\s+(?:return|output|provide|show)\b.{0,30}\b(?:code|fix)\b|"
+        r"\b(?:code|fix)\s+only\b",
+        prompt,
+        re.I,
+    ):
+        return cleaned
+    diagnosis = CODE_DEBUG_DIAGNOSES.get(method)
+    if diagnosis is None:
+        return cleaned
+    return f"{diagnosis}\n\n```python\n{cleaned}\n```"
+
+
 def _last_resort_answer(prompt: str, category: str) -> str:
+    solver = LOCAL_SOLVERS.get(category)
+    if solver is not None:
+        local = solver(prompt)
+        if local is not None and local.answer.strip():
+            return local.answer.strip()
     if category == "sentiment":
-        local = solve_sentiment(prompt)
-        return local.answer if local else "neutral"
-    if category == "math":
-        local = solve_math(prompt)
-        return local.answer if local else ""
+        return "neutral"
     if category == "ner":
-        local = solve_ner(prompt)
-        return local.answer if local else "[]"
+        return "[]"
     return ""

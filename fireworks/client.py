@@ -22,12 +22,12 @@ DEFAULT_MODELS = (
 
 MODEL_PREFERENCE = {
     "factual_qa": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
-    "math": ("minimax-m3", "gemma-4-26b-a4b-it", "gemma-4-31b-it-nvfp4"),
+    "math": ("minimax-m3", "kimi-k2p7-code", "gemma-4-26b-a4b-it"),
     "sentiment": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "summarization": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "ner": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "code_debugging": ("kimi-k2p7-code", "minimax-m3", "gemma-4-31b-it-nvfp4"),
-    "logic": ("minimax-m3", "gemma-4-26b-a4b-it", "gemma-4-31b-it-nvfp4"),
+    "logic": ("minimax-m3", "kimi-k2p7-code", "gemma-4-26b-a4b-it"),
     "code_generation": ("kimi-k2p7-code", "minimax-m3", "gemma-4-31b-it-nvfp4"),
 }
 
@@ -38,7 +38,7 @@ MAX_TOKENS = {
     "summarization": 224,
     "ner": 224,
     "code_debugging": 384,
-    "logic": 192,
+    "logic": 384,
     "code_generation": 512,
 }
 
@@ -347,9 +347,14 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
 def validate_model_answer(answer: str, category: str, prompt: str) -> None:
     if category == "code_generation" and _expects_python(prompt, answer):
         try:
-            ast.parse(answer)
+            tree = ast.parse(answer)
         except SyntaxError as exc:
             raise FireworksError(f"model returned invalid Python: {exc.msg}", status_code=502) from exc
+        _validate_requested_python_names(tree, prompt)
+
+    if category == "code_generation" and re.search(r"\bsql\b", prompt, re.I):
+        if not re.match(r"\s*(?:WITH|SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER)\b", answer, re.I):
+            raise FireworksError("model returned invalid SQL-shaped output", status_code=502)
 
     if category == "code_debugging":
         if _requires_bug_diagnosis(prompt) and not _has_bug_diagnosis(answer):
@@ -365,12 +370,33 @@ def validate_model_answer(answer: str, category: str, prompt: str) -> None:
             )
         if python_candidate is not None:
             try:
-                ast.parse(python_candidate)
+                tree = ast.parse(python_candidate)
             except SyntaxError as exc:
                 raise FireworksError(
                     f"model returned invalid Python fix: {exc.msg}",
                     status_code=502,
                 ) from exc
+            _validate_requested_python_names(tree, prompt)
+
+    if category == "sentiment":
+        instruction = prompt.split(":", maxsplit=1)[0]
+        allowed_labels = {
+            label.lower()
+            for label in re.findall(
+                r"\b(?:positive|negative|neutral|mixed|favorable|unfavorable|"
+                r"favourable|unfavourable)\b",
+                instruction,
+                re.I,
+            )
+        }
+        returned_label = re.fullmatch(
+            r"\s*(positive|negative|neutral|mixed|favorable|unfavorable|"
+            r"favourable|unfavourable)\s*[.!]?\s*",
+            answer,
+            re.I,
+        )
+        if allowed_labels and returned_label and returned_label.group(1).lower() not in allowed_labels:
+            raise FireworksError("model returned a sentiment label outside the allowed set", status_code=502)
 
     if category == "summarization":
         bullet_request = re.search(
@@ -402,6 +428,27 @@ def validate_model_answer(answer: str, category: str, prompt: str) -> None:
                     f"model exceeded {word_limit.group(1)}-word limit",
                     status_code=502,
                 )
+        exact_words = re.search(r"\bexactly\s+(\d+)\s+words?\b", prompt, re.I)
+        if exact_words is not None:
+            words = re.findall(r"\b[\w'-]+\b", answer)
+            if len(words) != int(exact_words.group(1)):
+                raise FireworksError(
+                    f"model returned {len(words)} words; expected exactly {exact_words.group(1)}",
+                    status_code=502,
+                )
+        sentence_request = re.search(
+            r"\b(?:in\s+)?(?:exactly\s+)?(?P<count>[1-5]|one|two|three|four|five)\s+sentences?\b",
+            prompt,
+            re.I,
+        )
+        if sentence_request is not None:
+            expected = _small_number(sentence_request.group("count"))
+            actual = _sentence_count(answer)
+            if actual != expected:
+                raise FireworksError(
+                    f"model returned {actual} sentences; expected {expected}",
+                    status_code=502,
+                )
 
     if category == "ner" and re.search(r"\bjson\b", prompt, re.I):
         try:
@@ -426,6 +473,41 @@ def _expects_python(prompt: str, answer: str) -> bool:
         re.search(r"\bpython\b|```python|\bdef\s+[A-Za-z_]", prompt, re.I)
         or re.match(r"\s*(?:from\s+\S+\s+import|import\s+\S+|async\s+def|def|class)\b", answer)
     )
+
+
+def _validate_requested_python_names(tree: ast.AST, prompt: str) -> None:
+    requested = {
+        match.group(1)
+        for match in re.finditer(
+            r"\b(?:function|def)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+            prompt,
+            re.I,
+        )
+    }
+    if not requested:
+        return
+    returned = {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    missing = requested - returned
+    if missing:
+        raise FireworksError(
+            "model omitted requested Python function: " + ", ".join(sorted(missing)),
+            status_code=502,
+        )
+
+
+def _sentence_count(text: str) -> int:
+    normalized = re.sub(
+        r"\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|e\.g|i\.e)\.",
+        lambda match: match.group(0).replace(".", ""),
+        text,
+        flags=re.I,
+    )
+    sentences = [part for part in re.split(r"(?<=[.!?])\s+", normalized.strip()) if part.strip()]
+    return len(sentences) if sentences else int(bool(normalized.strip()))
 
 
 def _requires_bug_diagnosis(prompt: str) -> bool:
@@ -518,4 +600,6 @@ def _small_number(raw: str) -> int:
 
 
 def _should_try_next_model(exc: FireworksError) -> bool:
-    return exc.status_code in {400, 404, 408, 429, 500, 502, 503, 504}
+    # Network/timeout/response-decoding failures have no HTTP status and are transient. Trying
+    # another allowed model is safer than turning an otherwise answerable task into an empty row.
+    return exc.status_code is None or exc.status_code in {400, 404, 408, 429, 500, 502, 503, 504}
