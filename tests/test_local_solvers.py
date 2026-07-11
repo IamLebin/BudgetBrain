@@ -407,6 +407,34 @@ class LocalSolverTests(unittest.TestCase):
             "code_debugging",
         )
 
+    def test_code_explanation_does_not_execute_embedded_math_prompt(self) -> None:
+        prompt = (
+            "what is this code for, i dont understand\n\n"
+            "def test_math_average_and_linear_equation(self):\n"
+            "    self.assertEqual(solve_math(\"Find the average of 4, 6, and 8.\").answer, \"6\")"
+        )
+        explanation = "This unit test checks that the math solver calculates an average correctly."
+        solved = solve_prompt(prompt, client=FakeFireworksClient({prompt: explanation}))
+        self.assertEqual(solved.category, "factual_qa")
+        self.assertEqual(solved.source, "fireworks")
+        self.assertEqual(solved.answer, explanation)
+
+        explanation_prompts = (
+            "Explain this code: ```python\ndef total(values): return sum(values)\n```",
+            "Help me understand this snippet: def first(items): return items[0]",
+            "Walk me through this code: class User: pass",
+        )
+        for explanation_prompt in explanation_prompts:
+            with self.subTest(prompt=explanation_prompt):
+                self.assertEqual(classify_prompt(explanation_prompt).category, "factual_qa")
+
+        self.assertEqual(
+            classify_prompt(
+                "Explain this code and fix the bug: ```python\ndef total(values): return values[0]\n```"
+            ).category,
+            "code_debugging",
+        )
+
     def test_classifier_distinguishes_concepts_from_requested_tasks(self) -> None:
         factual_questions = (
             "What is sentiment analysis?",
@@ -653,7 +681,6 @@ class LocalSolverTests(unittest.TestCase):
 
     def test_accuracy_first_uses_only_verified_semantic_shortcuts(self) -> None:
         prompts = {
-            'Classify the sentiment: "This is excellent."': "positive",
             "Extract named entities from: Maya Chen visited Paris.": "Maya Chen PERSON Paris LOCATION",
             "This Python function has a bug: def top(xs): return xs[0]. Fix it.": "def top(xs):\n    return max(xs)",
         }
@@ -663,6 +690,14 @@ class LocalSolverTests(unittest.TestCase):
                 solved = solve_prompt(prompt, client=client)
                 self.assertEqual(solved.source, "fireworks")
                 self.assertEqual(solved.answer, expected)
+
+        safe_sentiment = solve_prompt('Classify the sentiment: "This is excellent."', client=client)
+        self.assertEqual(safe_sentiment.source, "local:strong_single_lexicon")
+        self.assertEqual(safe_sentiment.answer, "positive")
+
+        ambiguous_sentiment = 'Classify the sentiment: "It might be good, but the result is unclear."'
+        client.responses[ambiguous_sentiment] = "neutral"
+        self.assertEqual(solve_prompt(ambiguous_sentiment, client=client).source, "fireworks")
 
         safe_summary = solve_prompt(
             "Summarize in one sentence: The release is stable and fast.",

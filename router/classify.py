@@ -14,6 +14,8 @@ def classify_prompt(prompt: str) -> Classification:
     text = prompt.strip()
     lower = text.lower()
 
+    if _looks_like_code_explanation(text, lower):
+        return Classification("factual_qa", 0.92)
     if _looks_like_code_debugging(text, lower):
         return Classification("code_debugging", 0.94)
     if _looks_like_code_generation(lower):
@@ -29,6 +31,32 @@ def classify_prompt(prompt: str) -> Classification:
     if _looks_like_math(lower):
         return Classification("math", 0.9)
     return Classification("factual_qa", 0.55)
+
+
+def _looks_like_code_explanation(text: str, lower: str) -> bool:
+    if re.search(
+        r"\b(?:fix|debug|repair|correct|rewrite|bug|error|broken|wrong|fails?)\b",
+        lower,
+    ):
+        return False
+    code_context = "```" in text or bool(
+        re.search(
+            r"\b(?:async\s+def|def|class)\s+[A-Za-z_]\w*\b|"
+            r"\b(?:assert|return|import|self\.)\b",
+            text,
+        )
+    )
+    if not code_context:
+        return False
+    return bool(
+        re.search(
+            r"\bwhat\s+(?:is|does)\s+(?:this|the)\s+code\s+(?:for|do)\b|"
+            r"\bexplain\s+(?:this|the|following)\s+(?:code|snippet)\b|"
+            r"\b(?:help\s+me\s+understand|walk\s+me\s+through)\s+(?:this|the)\s+(?:code|snippet)\b|"
+            r"\bi\s+(?:do\s+not|don['’]?t|dont)\s+understand\s+(?:this\s+|the\s+)?code\b",
+            lower,
+        )
+    )
 
 
 def _looks_like_code_generation(lower: str) -> bool:

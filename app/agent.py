@@ -48,12 +48,15 @@ VERIFIED_LOCAL_METHODS = {
         "lexicon": 0.91,
         "factual_neutral": 0.92,
         "mixed_lexicon": 0.89,
+        "strong_single_lexicon": 0.93,
+        "explicit_negated_lexicon": 0.95,
     },
     "summarization": {
         "short_bullet_extraction": 0.93,
         "already_one_sentence": 0.92,
         "within_word_limit_passthrough": 0.99,
         "two_sentence_join": 0.96,
+        "short_source_passthrough": 0.99,
     },
     "ner": {
         "regex_entities": 0.9,
@@ -70,9 +73,16 @@ VERIFIED_LOCAL_METHODS = {
         "balanced_brackets_generation": 0.99,
         "merge_intervals_generation": 0.99,
         "grouped_average_sql_generation": 0.99,
+        "square_generation": 0.99,
+        "reverse_list_generation": 0.99,
+        "reverse_string_generation": 0.99,
+        "is_even_generation": 0.99,
+        "sum_list_generation": 0.99,
+        "count_vowels_generation": 0.99,
     },
     "factual_qa": {
         "stdlib_http_status": 0.99,
+        "stdlib_python_exception": 0.99,
     },
 }
 
@@ -131,12 +141,17 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
 
 
 def _can_use_local(prompt: str, category: str, method: str, confidence: float) -> bool:
-    if re.search(
+    explanation_requested = re.search(
         r"\b(?:explain|explanation|justify|reasoning|derive|step[- ]by[- ]step|"
         r"show\s+(?:your\s+)?(?:work|steps?))\b",
         prompt,
         re.I,
-    ):
+    )
+    exact_factual_explanation = category == "factual_qa" and method in {
+        "stdlib_http_status",
+        "stdlib_python_exception",
+    }
+    if explanation_requested and not exact_factual_explanation:
         return False
     if category in LOCAL_MIN_CONFIDENCE:
         return confidence >= LOCAL_MIN_CONFIDENCE[category]

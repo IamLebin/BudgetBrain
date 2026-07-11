@@ -15,7 +15,7 @@ NUMBER_WORDS = {
 
 
 def solve_summarization(prompt: str) -> LocalAnswer | None:
-    if not re.search(r"\b(?:summari[sz]e|summary|condense)\b", prompt, re.I):
+    if not re.search(r"\b(?:summari[sz]e|summary|condense|overview)\b", prompt, re.I):
         return None
     body = _summary_source(prompt)
     if body is None:
@@ -47,7 +47,11 @@ def solve_summarization(prompt: str) -> LocalAnswer | None:
         answer = "\n".join(f"- {_bullet_text(sentence)}" for sentence in sentences)
         return LocalAnswer(answer, 0.93, "short_bullet_extraction")
 
-    one_sentence = re.search(r"\b(?:in|as)\s+(?:exactly\s+)?one\s+sentence\b", prompt, re.I)
+    one_sentence = re.search(
+        r"\b(?:(?:in|as)\s+(?:exactly\s+)?one\s+sentence|one[- ]sentence\s+(?:summary|overview))\b",
+        prompt,
+        re.I,
+    )
     if one_sentence is not None and len(sentences) == 1:
         word_count = len(re.findall(r"\b[\w'-]+\b", sentences[0]))
         if 5 <= word_count <= 30:
@@ -61,6 +65,10 @@ def solve_summarization(prompt: str) -> LocalAnswer | None:
             if leading_word is not None and leading_word.group(0)[1:].islower():
                 second = second[0].lower() + second[1:]
             return LocalAnswer(f"{first}; {second}", 0.96, "two_sentence_join")
+    if bullet_request is None and len(sentences) == 1:
+        word_count = len(re.findall(r"\b[\w'-]+\b", sentences[0]))
+        if 4 <= word_count <= 30:
+            return LocalAnswer(sentences[0], 0.99, "short_source_passthrough")
     return None
 
 

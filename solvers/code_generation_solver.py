@@ -15,6 +15,58 @@ def solve_code_generation(prompt: str) -> LocalAnswer | None:
         return None
 
     signature = _requested_signature(prompt)
+    if re.search(r"\bsquare\b", lower) and re.search(
+        r"\b(?:multipl(?:y|ied)\s+by|times)\s+(?:itself|the\s+number)\b|\bn\s*\*\s*n\b",
+        lower,
+    ):
+        name = signature[0] if signature else (_requested_function_name(prompt) or "square")
+        parameter_match = re.search(
+            r"\breturns?\s+([A-Za-z_][A-Za-z0-9_]*)\s+(?:multiplied\s+by|times)\s+itself\b",
+            prompt,
+            re.I,
+        )
+        parameter = signature[1] if signature else (parameter_match.group(1) if parameter_match else "n")
+        return _answer(
+            f"def {name}({parameter}):\n    return {parameter} * {parameter}",
+            "square_generation",
+        )
+    if re.search(r"\brevers(?:e|es|ing)\s+(?:a\s+|the\s+)?list\b", lower) and not re.search(
+        r"\bin[- ]place\b|\bwithout\s+(?:slicing|built-?ins?)\b",
+        lower,
+    ):
+        name, parameter = signature or ("reverse_list", "items")
+        return _answer(
+            f"def {name}({parameter}):\n    return {parameter}[::-1]",
+            "reverse_list_generation",
+        )
+    if re.search(r"\brevers(?:e|es|ing)\s+(?:a\s+|the\s+)?string\b", lower) and not re.search(
+        r"\bwithout\s+slicing\b",
+        lower,
+    ):
+        name, parameter = signature or ("reverse_string", "text")
+        return _answer(
+            f"def {name}({parameter}):\n    return {parameter}[::-1]",
+            "reverse_string_generation",
+        )
+    if re.search(r"\b(?:is|whether)\s+[A-Za-z_][A-Za-z0-9_]*\s+is\s+even\b", lower):
+        name, parameter = signature or ("is_even", "n")
+        return _answer(
+            f"def {name}({parameter}):\n    return {parameter} % 2 == 0",
+            "is_even_generation",
+        )
+    if re.search(r"\b(?:returns?|calculates?)\s+the\s+(?:sum|total)\s+of\s+(?:a\s+|the\s+)?list\b", lower):
+        name, parameter = signature or ("sum_list", "numbers")
+        return _answer(
+            f"def {name}({parameter}):\n    return sum({parameter})",
+            "sum_list_generation",
+        )
+    if re.search(r"\bcounts?\s+(?:the\s+)?vowels\s+in\s+(?:a\s+|the\s+)?string\b", lower):
+        name, parameter = signature or ("count_vowels", "text")
+        return _answer(
+            f"def {name}({parameter}):\n"
+            f"    return sum(ch.lower() in 'aeiou' for ch in {parameter})",
+            "count_vowels_generation",
+        )
     if re.search(r"\bsecond[- ]largest\b", lower) and not re.search(
         r"\b(?:count|include|including|allow)\w*\s+duplicates?\b", lower
     ):
@@ -72,6 +124,15 @@ def _requested_signature(prompt: str) -> tuple[str, str] | None:
         re.I,
     )
     return (match.group(1), match.group(2)) if match else None
+
+
+def _requested_function_name(prompt: str) -> str | None:
+    match = re.search(
+        r"\bfunction\s+(?:called|named)\s+([A-Za-z_][A-Za-z0-9_]*)\b",
+        prompt,
+        re.I,
+    )
+    return match.group(1) if match else None
 
 
 def _solve_grouped_average_sql(lower: str) -> str | None:
