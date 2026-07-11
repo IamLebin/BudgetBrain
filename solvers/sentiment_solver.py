@@ -126,15 +126,30 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
         return None
     positive_hits = 0
     negative_hits = 0
+    negated_hits = 0
     for idx, token in enumerate(tokens):
         if token in POSITIVE or token in NEGATIVE:
             sign = 1 if token in POSITIVE else -1
             if _is_negated(tokens, idx):
                 sign *= -1
+                negated_hits += 1
             if sign > 0:
                 positive_hits += 1
             else:
                 negative_hits += 1
+    works_perfectly = re.search(
+        r"\b(?:works?|worked|working|runs?|ran|functions?|functioned|operates?|operated)\s+perfectly\b",
+        text,
+        re.I,
+    )
+    negated_perfectly = re.search(
+        r"\b(?:not|never|hardly|barely|doesn['’]?t|didn['’]?t|isn['’]?t)\b.{0,24}"
+        r"\b(?:work|works|worked|run|runs|function|functions|operate|operates)\s+perfectly\b",
+        text,
+        re.I,
+    )
+    if works_perfectly and not negated_perfectly:
+        positive_hits += 1
     hits = positive_hits + negative_hits
     if hits == 0:
         if _looks_clearly_factual(text):
@@ -155,11 +170,37 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
         else:
             label = "mixed"
         return LocalAnswer(label, min(0.95, 0.84 + hits * 0.03), "mixed_lexicon")
+    if hits == 1 and _is_short_unambiguous_statement(text):
+        label = "positive" if positive_hits else "negative"
+        label = _requested_label_style(label, prompt)
+        method = "explicit_negated_lexicon" if negated_hits else "strong_single_lexicon"
+        return LocalAnswer(label, 0.95 if negated_hits else 0.93, method)
     if positive_hits:
         return LocalAnswer("positive", min(0.96, 0.72 + hits * 0.1), "lexicon")
     if negative_hits:
         return LocalAnswer("negative", min(0.96, 0.72 + hits * 0.1), "lexicon")
     return None
+
+
+def _is_short_unambiguous_statement(text: str) -> bool:
+    words = re.findall(r"[A-Za-z']+", text.lower())
+    if not (2 <= len(words) <= 14) or text.strip().endswith("?"):
+        return False
+    return not re.search(
+        r"\b(?:but|however|although|yet|maybe|perhaps|possibly|somewhat|unclear|"
+        r"apparently|supposedly|seems?|might|could|hardly|barely)\b",
+        text,
+        re.I,
+    )
+
+
+def _requested_label_style(label: str, prompt: str) -> str:
+    instruction = prompt.split(":", maxsplit=1)[0].lower()
+    if "favorable" in instruction or "unfavorable" in instruction:
+        return "favorable" if label == "positive" else "unfavorable"
+    if "favourable" in instruction or "unfavourable" in instruction:
+        return "favourable" if label == "positive" else "unfavourable"
+    return label
 
 
 def _is_negated(tokens: list[str], index: int) -> bool:

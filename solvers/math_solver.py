@@ -57,6 +57,14 @@ def solve_math(prompt: str) -> LocalAnswer | None:
     if average is not None:
         return average
 
+    median = _solve_median(cleaned)
+    if median is not None:
+        return median
+
+    symbolic = _solve_symbolic_equation(cleaned)
+    if symbolic is not None:
+        return symbolic
+
     equation = _solve_linear_equation(cleaned)
     if equation is not None:
         return equation
@@ -418,6 +426,57 @@ def _solve_linear_equation(text: str) -> LocalAnswer | None:
     right = Fraction(match.group(3).replace(" ", ""))
     value = (right - constant) / coefficient
     return LocalAnswer(_format_number(value), 0.98, "linear_equation")
+
+
+def _solve_median(text: str) -> LocalAnswer | None:
+    number = r"-?\d+(?:\.\d+)?"
+    match = re.search(r"\bmedian\s+of\s+([^?\n]+)", text, re.I)
+    if match is None:
+        return None
+    raw_values = match.group(1).strip().rstrip(".!")
+    normalized = re.sub(r"\s*,?\s+and\s+", ",", raw_values, flags=re.I)
+    parts = [part.strip() for part in normalized.split(",")]
+    if len(parts) < 2 or any(re.fullmatch(number, part) is None for part in parts):
+        return None
+    values = sorted(Fraction(value) for value in parts)
+    if len(values) < 2:
+        return None
+    middle = len(values) // 2
+    median = values[middle] if len(values) % 2 else (values[middle - 1] + values[middle]) / 2
+    return LocalAnswer(_format_number(median), 0.99, "median")
+
+
+def _solve_symbolic_equation(text: str) -> LocalAnswer | None:
+    request = re.search(r"\bsolve\s+for\s+([A-Za-z])\b", text, re.I)
+    equation = re.search(
+        r"(?<![A-Za-z0-9])([A-Za-z])\s*([+-])\s*([A-Za-z])\s*=\s*([A-Za-z])"
+        r"(?![A-Za-z0-9])",
+        text,
+        re.I,
+    )
+    if request is None or equation is None:
+        return None
+    if len(re.findall(r"(?<![A-Za-z0-9])[A-Za-z]\s*[+-]\s*[A-Za-z]\s*=\s*[A-Za-z]", text)) != 1:
+        return None
+    target = request.group(1).lower()
+    left, op, right, result = (
+        equation.group(1).lower(),
+        equation.group(2),
+        equation.group(3).lower(),
+        equation.group(4).lower(),
+    )
+    if len({left, right, result}) != 3 or target not in {left, right, result}:
+        return None
+    if target == result:
+        isolated = f"{left} {op} {right}"
+    elif target == left:
+        inverse = "-" if op == "+" else "+"
+        isolated = f"{result} {inverse} {right}"
+    elif op == "+":
+        isolated = f"{result} - {left}"
+    else:
+        isolated = f"{left} - {result}"
+    return LocalAnswer(f"{target} = {isolated}", 0.99, "symbolic_isolation")
 
 
 def _solve_simple_word_arithmetic(text: str) -> LocalAnswer | None:
