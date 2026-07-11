@@ -313,7 +313,10 @@ def _solve_exactly_one_truth(prompt: str, lower: str) -> LocalAnswer | None:
     if len(truth_assignments) != 1:
         return None
     true_names = [name for name, truth in truth_assignments[0].items() if truth]
-    return LocalAnswer(", ".join(true_names) if true_names else "none", 0.88, "exactly_one_truth")
+    # Every supported statement is evaluated against every possible truth assignment, and we
+    # return only when exactly one globally consistent world exists. This path is deterministic,
+    # not a heuristic guess, so it is safe for the agent's high-confidence local gate.
+    return LocalAnswer(", ".join(true_names) if true_names else "none", 0.99, "exactly_one_truth")
 
 
 def _statement_truth(statement: str, world: dict[str, bool]) -> bool | None:

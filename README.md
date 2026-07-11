@@ -47,7 +47,7 @@ sh scripts/run_real_eval.sh --fixture eval/fixtures/official_practice.json
 Docker smoke run:
 
 ```bash
-docker buildx build --platform linux/amd64 -t budgetbrain-track1 .
+docker buildx build --platform linux/amd64 -f Dockerfile.track1 -t budgetbrain-track1 .
 docker run --rm \
   --env-file .env \
   -v "$PWD/tests/sample_inputs:/input:ro" \
@@ -59,6 +59,7 @@ Current verified local image:
 
 ```bash
 docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+  -f Dockerfile.track1 \
   -t budgetbrain-track1:local --load .
 docker run --rm --platform linux/amd64 \
   --env-file .env \

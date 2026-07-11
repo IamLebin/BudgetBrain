@@ -1,0 +1,20 @@
+[
+  {"task_id":"concept-sentiment","category":"factual_qa","prompt":"What is sentiment analysis?","fake_answer":"Sentiment analysis identifies the emotional polarity expressed in text.","contains":["emotional","text"]},
+  {"task_id":"concept-ner","category":"factual_qa","prompt":"Explain named entity recognition and why it is useful.","fake_answer":"Named entity recognition identifies and categorizes entities in text.","contains":["entities","text"]},
+  {"task_id":"concept-logic","category":"factual_qa","prompt":"What is a logic puzzle?","fake_answer":"A logic puzzle is solved through deduction from stated constraints.","contains":["deduction","constraints"]},
+  {"task_id":"concept-summary-language","category":"factual_qa","prompt":"What is the main idea behind binary search?","fake_answer":"Binary search repeatedly halves a sorted search space.","contains":["halves","sorted"]},
+  {"task_id":"concept-code","category":"factual_qa","prompt":"Explain how to write a function in Python.","fake_answer":"Define it with def, parameters, and an indented body.","contains":["def","body"]},
+  {"task_id":"concept-error","category":"factual_qa","prompt":"Explain what a TypeError means in Python.","fake_answer":"A TypeError indicates an operation received an incompatible type.","contains":["incompatible","type"]},
+  {"task_id":"task-sentiment","category":"sentiment","prompt":"Analyze the sentiment of: The setup is excellent.","fake_answer":"positive","expected":"positive"},
+  {"task_id":"task-ner","category":"ner","prompt":"Extract the named entities from: Ada joined Acme Inc.","fake_answer":"Ada PERSON Acme Inc ORG","contains":["Ada","Acme Inc"]},
+  {"task_id":"task-summary","category":"summarization","prompt":"Provide a summary of this report: Revenue rose while costs stayed flat.","fake_answer":"Revenue increased while costs remained stable.","contains":["Revenue","costs"]},
+  {"task_id":"task-code-generation","category":"code_generation","prompt":"Can you write a Python function that reverses a list?","fake_answer":"def reverse_list(items):\n    return items[::-1]","contains":["def reverse_list","[::-1]"]},
+  {"task_id":"task-code-debugging","category":"code_debugging","prompt":"I get a TypeError in this Python function; why does it fail?","fake_answer":"The function combines incompatible operand types.","contains":["incompatible","types"]},
+  {"task_id":"variant-sentiment","category":"sentiment","prompt":"Determine whether this review is favorable or unfavorable: It works perfectly.","fake_answer":"favorable","expected":"favorable"},
+  {"task_id":"variant-ner","category":"ner","prompt":"Identify all people, companies, cities, and dates in the passage.","fake_answer":"Ada PERSON Acme ORG Paris LOCATION July 8 DATE","contains":["Ada","Acme","Paris","July 8"]},
+  {"task_id":"variant-summary","category":"summarization","prompt":"Give a one-sentence overview of this report: Revenue rose and costs fell.","fake_answer":"Revenue increased while costs decreased.","contains":["Revenue","costs"]},
+  {"task_id":"variant-debug","category":"code_debugging","prompt":"Spot the defect in this Python function and repair it.","fake_answer":"The function has an incorrect return statement.","contains":["incorrect","return"]},
+  {"task_id":"variant-codegen","category":"code_generation","prompt":"Provide SQL that lists every active customer.","fake_answer":"SELECT * FROM customers WHERE active = TRUE;","contains":["SELECT","customers","active"]},
+  {"task_id":"variant-logic","category":"logic","prompt":"Given these constraints, which assignment must be true?","fake_answer":"Assignment A must be true.","contains":["Assignment A"]},
+  {"task_id":"variant-math","category":"math","prompt":"Solve for x: x + y = z.","fake_answer":"x = z - y","contains":["z - y"]}
+]

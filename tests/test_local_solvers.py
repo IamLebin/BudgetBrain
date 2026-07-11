@@ -407,6 +407,46 @@ class LocalSolverTests(unittest.TestCase):
             "code_debugging",
         )
 
+    def test_classifier_distinguishes_concepts_from_requested_tasks(self) -> None:
+        factual_questions = (
+            "What is sentiment analysis?",
+            "Explain named entity recognition and why it is useful.",
+            "What is a logic puzzle?",
+            "What is the main idea behind binary search?",
+            "What are the key points of the TCP three-way handshake?",
+            "Explain how to write a function in Python.",
+            "Explain what a TypeError means in Python.",
+        )
+        for prompt in factual_questions:
+            with self.subTest(prompt=prompt):
+                self.assertEqual(classify_prompt(prompt).category, "factual_qa")
+
+        requested_tasks = {
+            'Analyze the sentiment of: "The setup is excellent."': "sentiment",
+            "Extract the named entities from: Ada joined Acme Inc.": "ner",
+            "Summarize the following passage: The launch was delayed by rain.": "summarization",
+            "Provide a summary of this report: Revenue rose while costs stayed flat.": "summarization",
+            "Can you write a Python function that reverses a list?": "code_generation",
+            "I get a TypeError in this Python function; why does it fail?": "code_debugging",
+        }
+        for prompt, expected in requested_tasks.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(classify_prompt(prompt).category, expected)
+
+    def test_classifier_handles_hidden_style_instruction_variants(self) -> None:
+        cases = {
+            'Determine whether this review is favorable or unfavorable: "It works perfectly."': "sentiment",
+            "Identify all people, companies, cities, and dates in the passage.": "ner",
+            "Give a one-sentence overview of this report: Revenue rose and costs fell.": "summarization",
+            "Spot the defect in this Python function and repair it.": "code_debugging",
+            "Provide SQL that lists every active customer.": "code_generation",
+            "Given these constraints, which assignment must be true?": "logic",
+            "Solve for x: x + y = z.": "math",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(classify_prompt(prompt).category, expected)
+
     def test_fireworks_model_selection_prefers_code_model(self) -> None:
         client = FireworksClient(
             api_key="test",
@@ -482,6 +522,13 @@ class LocalSolverTests(unittest.TestCase):
             clean_model_answer('```json\n[{"entity":"Ada","type":"PERSON"}]\n```', "ner"),
             '[{"entity":"Ada","type":"PERSON"}]',
         )
+        self.assertEqual(
+            clean_model_answer(
+                "Ada: PERSON\nAcme: ORGANIZATION\nParis: GPE",
+                "ner",
+            ),
+            "Ada: PERSON\nAcme: ORG\nParis: LOCATION",
+        )
 
     def test_short_classification_answers_are_normalized(self) -> None:
         self.assertEqual(
@@ -541,6 +588,37 @@ class LocalSolverTests(unittest.TestCase):
                 "Summarize in two bullet points: text",
             )
 
+    def test_code_debug_validation_requires_diagnosis_and_valid_fix(self) -> None:
+        prompt = (
+            "This function should return the max of a list but has a bug: "
+            "def get_max(nums): return nums[0]. Find and fix it."
+        )
+        complete = (
+            "The bug is that the function always returns the first item instead of the maximum.\n\n"
+            "```python\ndef get_max(nums):\n    return max(nums)\n```"
+        )
+        validate_model_answer(complete, "code_debugging", prompt)
+
+        with self.assertRaisesRegex(FireworksError, "omitted.*diagnosis"):
+            validate_model_answer(
+                "def get_max(nums):\n    return max(nums)",
+                "code_debugging",
+                prompt,
+            )
+
+        with self.assertRaisesRegex(FireworksError, "invalid Python fix"):
+            validate_model_answer(
+                "The function returns the wrong item.\n\n```python\ndef get_max(:\n    pass\n```",
+                "code_debugging",
+                prompt,
+            )
+
+        validate_model_answer(
+            "def get_max(nums):\n    return max(nums)",
+            "code_debugging",
+            prompt + " Return code only.",
+        )
+
     def test_remote_category_uses_injected_client(self) -> None:
         solved = solve_prompt("What is the capital city of Japan?", client=FakeFireworksClient())
         self.assertEqual(solved.category, "factual_qa")
@@ -563,6 +641,14 @@ class LocalSolverTests(unittest.TestCase):
 
         local_math = solve_prompt("What is 7 * (8 + 2)?", client=client)
         self.assertEqual(local_math.source, "local:safe_eval")
+
+        local_truth = solve_prompt(
+            'Logic puzzle: exactly one statement is true. Ava says "Ben is lying". '
+            'Ben says "Ava is lying". Cora says "Ava is lying". Who is telling the truth?',
+            client=client,
+        )
+        self.assertEqual(local_truth.source, "local:exactly_one_truth")
+        self.assertEqual(local_truth.answer, "Ava")
 
     def test_explanation_requests_escalate_exact_local_answers(self) -> None:
         math_prompt = "What is 7 * (8 + 2)? Show your work."

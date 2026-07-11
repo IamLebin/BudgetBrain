@@ -43,14 +43,26 @@ MAX_TOKENS = {
 }
 
 SYSTEM_PROMPTS = {
-    "factual_qa": "Answer every requested part accurately. Preserve the requested format; be concise.",
+    "factual_qa": (
+        "Answer every part concisely using standard textbook terms; follow the requested format."
+    ),
     "math": "Solve carefully and verify the arithmetic. Follow the requested format and detail level.",
     "sentiment": "Classify the full text using only allowed labels. Briefly justify when requested.",
     "summarization": "Preserve key facts and obey every length, count, and format constraint.",
-    "ner": "Extract every requested entity with the correct type and exact requested format.",
-    "code_debugging": "Find the actual bug and provide a correct runnable fix. Explain only when requested.",
+    "ner": (
+        "Extract all entities in the requested format using PERSON, ORG, LOCATION, and DATE "
+        "unless labels are provided."
+    ),
+    "code_debugging": (
+        "Briefly name the bug, then show the smallest runnable fix in a fenced block. Preserve "
+        "the signature and structure; prefer built-ins and give one fix only. Omit the diagnosis "
+        "only if code-only output is explicitly requested."
+    ),
     "logic": "Satisfy every stated constraint, verify the conclusion, and use the requested format.",
-    "code_generation": "Return complete runnable code satisfying the spec and edge cases; no prose unless asked.",
+    "code_generation": (
+        "Return only the shortest clear runnable code satisfying the stated requirements. "
+        "Do not add validation or edge-case behavior that was not requested."
+    ),
 }
 
 
@@ -276,6 +288,8 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
         fenced_json = re.fullmatch(r"```(?:json)?\s*\n?(.*?)\n?```", answer, flags=re.I | re.S)
         if fenced_json:
             answer = fenced_json.group(1).strip()
+        answer = re.sub(r"\bGPE\b", "LOCATION", answer, flags=re.I)
+        answer = re.sub(r"\bORGANIZATIONS?\b|\bORGANISATIONS?\b", "ORG", answer, flags=re.I)
     if category == "math" and not re.search(
         r"\b(explain|steps?|reasoning|derive)\b|\bshow\s+(?:your\s+)?work\b",
         prompt,
@@ -306,11 +320,27 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
 
 
 def validate_model_answer(answer: str, category: str, prompt: str) -> None:
-    if category in {"code_generation", "code_debugging"} and _expects_python(prompt, answer):
+    if category == "code_generation" and _expects_python(prompt, answer):
         try:
             ast.parse(answer)
         except SyntaxError as exc:
             raise FireworksError(f"model returned invalid Python: {exc.msg}", status_code=502) from exc
+
+    if category == "code_debugging":
+        if _requires_bug_diagnosis(prompt) and not _has_bug_diagnosis(answer):
+            raise FireworksError(
+                "model omitted the requested bug diagnosis",
+                status_code=502,
+            )
+        python_candidate = _debug_python_candidate(prompt, answer)
+        if python_candidate is not None:
+            try:
+                ast.parse(python_candidate)
+            except SyntaxError as exc:
+                raise FireworksError(
+                    f"model returned invalid Python fix: {exc.msg}",
+                    status_code=502,
+                ) from exc
 
     if category == "summarization":
         bullet_request = re.search(
@@ -366,6 +396,76 @@ def _expects_python(prompt: str, answer: str) -> bool:
         re.search(r"\bpython\b|```python|\bdef\s+[A-Za-z_]", prompt, re.I)
         or re.match(r"\s*(?:from\s+\S+\s+import|import\s+\S+|async\s+def|def|class)\b", answer)
     )
+
+
+def _requires_bug_diagnosis(prompt: str) -> bool:
+    if re.search(
+        r"\b(?:only|just)\s+(?:return|output|provide|show)\b.{0,30}\b(?:code|fix)\b|"
+        r"\b(?:code|fix)\s+only\b",
+        prompt,
+        re.I,
+    ):
+        return False
+    return bool(
+        re.search(
+            r"\b(?:debug|bug|error|issue|wrong|incorrect|broken|fails?|"
+            r"find\s+and\s+fix|identify|explain|why|what\s+is\s+wrong)\b",
+            prompt,
+            re.I,
+        )
+    )
+
+
+def _has_bug_diagnosis(answer: str) -> bool:
+    try:
+        ast.parse(answer)
+        return False
+    except SyntaxError:
+        pass
+    prose = re.sub(
+        r"```(?:[A-Za-z0-9_+.-]+)?\s*\n?.*?\n?```",
+        " ",
+        answer,
+        flags=re.S,
+    )
+    prose = re.sub(
+        r"(?m)^\s*(?:corrected|fixed|updated)\s+(?:code|implementation)\s*:\s*$",
+        " ",
+        prose,
+        flags=re.I,
+    )
+    prose = re.sub(
+        r"(?ms)^\s*(?:from\s+\S+\s+import|import\s+\S+|async\s+def|def|class)\b.*\Z",
+        " ",
+        prose,
+    )
+    return len(re.findall(r"\b[A-Za-z][A-Za-z'-]*\b", prose)) >= 4
+
+
+def _debug_python_candidate(prompt: str, answer: str) -> str | None:
+    if re.search(r"\bsql\b|\bjavascript\b|\btypescript\b|\bjava\b|\bc\+\+\b", prompt, re.I):
+        return None
+    fenced = re.search(
+        r"```(?:python|py)?\s*\n?(.*?)\n?```",
+        answer,
+        flags=re.I | re.S,
+    )
+    if fenced:
+        return fenced.group(1).strip()
+    try:
+        ast.parse(answer)
+        return answer
+    except SyntaxError:
+        pass
+    code_start = re.search(
+        r"(?m)^\s*(?:from\s+\S+\s+import|import\s+\S+|async\s+def|def|class)\b",
+        answer,
+    )
+    if code_start:
+        return answer[code_start.start():].strip()
+    if re.search(r"\bpython\b|```python|\bdef\s+[A-Za-z_]", prompt, re.I):
+        return answer
+    return None
 
 
 def _small_number(raw: str) -> int:

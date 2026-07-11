@@ -32,6 +32,14 @@ def classify_prompt(prompt: str) -> Classification:
 
 
 def _looks_like_code_generation(lower: str) -> bool:
+    if re.match(
+        r"\s*(?:what\s+(?:is|are)|how\s+(?:do|does|would)|explain\s+how|describe\s+how)\b",
+        lower,
+    ) and not re.search(
+        r"\b(?:provide|return|output|give|show|include)\b.{0,35}\b(?:code|implementation|function)\b",
+        lower,
+    ):
+        return False
     signals = (
         "write a function",
         "write a python function",
@@ -47,6 +55,10 @@ def _looks_like_code_generation(lower: str) -> bool:
         "code that",
         "give me code",
         "give me a function",
+        "provide code",
+        "provide a function",
+        "provide an sql",
+        "provide sql",
         "design a function",
         "design a class",
     )
@@ -60,6 +72,20 @@ def _looks_like_code_generation(lower: str) -> bool:
 
 
 def _looks_like_code_debugging(text: str, lower: str) -> bool:
+    code_context = "```" in text or bool(
+        re.search(
+            r"\b(?:code|function|method|class|program|script|algorithm|query|"
+            r"python|javascript|typescript|java|sql|c\+\+|rust|traceback)\b",
+            lower,
+        )
+    )
+    repair_intent = bool(
+        re.search(
+            r"\b(?:debug|fix|repair|correct|wrong|broken|fails?|failure|"
+            r"why\s+(?:does|is|am)|what(?:'s|\s+is)\s+wrong)\b",
+            lower,
+        )
+    )
     runtime_errors = (
         "traceback",
         "syntaxerror",
@@ -77,9 +103,9 @@ def _looks_like_code_debugging(text: str, lower: str) -> bool:
         "importerror",
         "recursionerror",
     )
-    if any(error in lower for error in runtime_errors):
+    if any(error in lower for error in runtime_errors) and (code_context and repair_intent):
         return True
-    if "syntax issue" in lower or "syntax error" in lower:
+    if ("syntax issue" in lower or "syntax error" in lower) and repair_intent:
         return True
     strong_signals = (
         "debug",
@@ -89,6 +115,10 @@ def _looks_like_code_debugging(text: str, lower: str) -> bool:
         "correct the code",
         "corrected implementation",
         "why does this code",
+        "spot the bug",
+        "spot the defect",
+        "locate the bug",
+        "repair the code",
     )
     if any(signal in lower for signal in strong_signals):
         return True
@@ -110,13 +140,9 @@ def _looks_like_code_debugging(text: str, lower: str) -> bool:
         "produces wrong",
         "gives wrong",
         "returns wrong",
-    )
-    code_context = "```" in text or bool(
-        re.search(
-            r"\b(?:code|function|method|class|program|script|algorithm|query|"
-            r"python|javascript|typescript|java|sql|c\+\+|rust|traceback)\b",
-            lower,
-        )
+        "has a defect",
+        "contains a defect",
+        "malfunctions",
     )
     if code_context and any(signal in lower for signal in contextual_signals):
         return True
@@ -126,15 +152,33 @@ def _looks_like_code_debugging(text: str, lower: str) -> bool:
 
 
 def _looks_like_summarization(lower: str, text: str) -> bool:
-    explicit = any(
-        word in lower
-        for word in (
-            "summarize", "summarise", "summary", "tl;dr", "tldr", "condense",
-            "brief overview", "key points", "main points", "main idea",
-            "give the gist", "in a nutshell",
+    if any(word in lower for word in ("summarize", "summarise", "tl;dr", "tldr", "condense")):
+        return True
+    source_object_context = bool(
+        re.search(
+            r"\b(?:following|above|below|provided|this)\s+"
+            r"(?:text|passage|article|report|document|email|update|story)\b",
+            lower,
         )
     )
-    if explicit:
+    if _is_concept_question(lower) and not source_object_context:
+        return False
+    source_context = bool(
+        source_object_context
+        or re.search(
+            r"\b(?:summary|overview|key points?|main points?|main idea|gist|takeaways?)"
+            r"\s+(?:of|for|from)\b",
+            lower,
+        )
+        or (":" in text and len(text.split(":", maxsplit=1)[-1].split()) >= 8)
+    )
+    if source_context and any(
+        phrase in lower
+        for phrase in (
+            "summary", "overview", "key point", "main point", "main idea", "gist",
+            "takeaway", "in a nutshell",
+        )
+    ):
         return True
     if re.search(
         r"\b(?:in|into)\s+(?:one|two|three|four|five|[1-5])\s+(?:bullet\s+points?|sentences?)\b",
@@ -145,6 +189,10 @@ def _looks_like_summarization(lower: str, text: str) -> bool:
 
 
 def _looks_like_ner(lower: str) -> bool:
+    if _is_concept_question(lower) and not re.search(
+        r"\b(?:extract|identify|label|list|tag|recognize|find)\b", lower
+    ):
+        return False
     signals = (
         "extract named entities",
         "named entities",
@@ -169,10 +217,23 @@ def _looks_like_ner(lower: str) -> bool:
         "identify all named",
         "entities and types",
     )
-    return any(signal in lower for signal in signals)
+    if any(signal in lower for signal in signals):
+        return True
+    return bool(
+        re.search(r"\b(?:extract|identify|list|label|tag|find)\b", lower)
+        and re.search(
+            r"\b(?:people|persons?|names?|organizations?|organisations?|orgs?|companies|"
+            r"locations?|places?|cities|dates?|entities)\b",
+            lower,
+        )
+    )
 
 
 def _looks_like_sentiment(lower: str) -> bool:
+    if _is_concept_question(lower) and not re.search(
+        r"\b(?:classify|analyze|analyse|determine|label|identify)\b", lower
+    ):
+        return False
     signals = (
         "sentiment",
         "positive, negative, or neutral",
@@ -185,19 +246,27 @@ def _looks_like_sentiment(lower: str) -> bool:
         "is this review positive",
         "tone of",
         "what is the tone",
+        "favorable or unfavorable",
+        "favourable or unfavourable",
+        "emotion conveyed",
+        "attitude expressed",
     )
     if any(signal in lower for signal in signals):
         return True
     return bool(
         re.search(
             r"\bclassify\b.{0,40}\b(?:as|into)\b.{0,30}"
-            r"\b(?:positive|negative|neutral)\b",
+            r"\b(?:positive|negative|neutral|favorable|unfavorable|favourable|unfavourable)\b",
             lower,
         )
     )
 
 
 def _looks_like_logic(lower: str) -> bool:
+    if _is_concept_question(lower) and not re.search(
+        r"\b(?:deduce|conclude|solve|infer|must be true|does it follow)\b", lower
+    ):
+        return False
     signals = (
         "logic puzzle",
         "logical puzzle",
@@ -228,6 +297,10 @@ def _looks_like_logic(lower: str) -> bool:
         "different day",
         "order from left to right",
         "order from first to last",
+        "given these constraints",
+        "given the constraints",
+        "which must be true",
+        "who can be",
     )
     if any(signal in lower for signal in signals):
         return True
@@ -281,6 +354,11 @@ def _looks_like_math(lower: str) -> bool:
         "final price",
         "net pay",
     )
+    if "=" in lower and re.search(
+        r"\b(?:solve|find)\s+(?:the\s+value\s+of\s+|for\s+)?[a-z]\b",
+        lower,
+    ):
+        return True
     has_number = bool(
         re.search(r"\d", lower)
         or re.search(
@@ -299,4 +377,13 @@ def _looks_like_math(lower: str) -> bool:
     )
     return has_number and (
         has_operator or numeric_difference or any(word in lower for word in math_words)
+    )
+
+
+def _is_concept_question(lower: str) -> bool:
+    return bool(
+        re.match(
+            r"\s*(?:what\s+(?:is|are|does)|define|explain|describe|how\s+does)\b",
+            lower,
+        )
     )
