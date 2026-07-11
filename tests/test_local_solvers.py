@@ -15,12 +15,14 @@ from fireworks.client import (
     model_id_for_request,
     normalize_model_id,
     parse_allowed_models,
+    validate_model_answer,
 )
 from router.classify import classify_prompt
 from solvers.code_debug_solver import solve_code_debug
 from solvers.math_solver import solve_math
 from solvers.ner_solver import solve_ner
 from solvers.sentiment_solver import solve_sentiment
+from solvers.summarization_solver import solve_summarization
 from solvers.logic_solver import solve_logic
 
 
@@ -152,6 +154,39 @@ class LocalSolverTests(unittest.TestCase):
             solve_sentiment('Classify the sentiment: "Just great, another crash."')
         )
 
+    def test_sentiment_factual_neutral_and_contracted_negation(self) -> None:
+        neutral = solve_sentiment(
+            "Classify as positive, negative, or neutral: The package arrived on Tuesday as scheduled."
+        )
+        self.assertIsNotNone(neutral)
+        self.assertEqual(neutral.answer, "neutral")
+        self.assertGreaterEqual(neutral.confidence, 0.82)
+        negated = solve_sentiment(
+            'Classify the sentiment: "I don\'t think this is good."'
+        )
+        self.assertIsNotNone(negated)
+        self.assertEqual(negated.answer, "negative")
+        self.assertEqual(
+            solve_sentiment("Classify the sentiment: The package arrived late on Tuesday.").answer,
+            "negative",
+        )
+
+    def test_short_bullet_summary_is_local_only_when_structure_is_safe(self) -> None:
+        solved = solve_summarization(
+            "Summarize this update in two bullet points: "
+            "The release fixes login failures on older phones. "
+            "It also reduces image upload time and adds clearer error messages."
+        )
+        self.assertIsNotNone(solved)
+        self.assertEqual(len(solved.answer.splitlines()), 2)
+        self.assertIn("login", solved.answer)
+        self.assertIn("upload", solved.answer)
+        self.assertIsNone(
+            solve_summarization(
+                "Summarize in two bullet points: This is only one source sentence."
+            )
+        )
+
     def test_ner_json_shape(self) -> None:
         solved = solve_ner('Extract named entities from: "Maya Lee visited Google Labs in Paris on July 8, 2026."')
         self.assertIsNotNone(solved)
@@ -185,6 +220,16 @@ class LocalSolverTests(unittest.TestCase):
             {"text": "The New York Times", "label": "ORG"},
             json.loads(organization.answer),
         )
+
+    def test_ner_location_prefixes_and_org_suffixes(self) -> None:
+        solved = solve_ner(
+            "Extract named entities and types from: Maya Chen visited Mount Everest "
+            "after meeting the European Union in Brussels."
+        )
+        self.assertIsNotNone(solved)
+        entities = json.loads(solved.answer)
+        self.assertIn({"text": "Mount Everest", "label": "LOCATION"}, entities)
+        self.assertIn({"text": "European Union", "label": "ORG"}, entities)
 
     def test_logic_exactly_one_truth(self) -> None:
         solved = solve_logic(
@@ -222,6 +267,12 @@ class LocalSolverTests(unittest.TestCase):
         )
         self.assertIsNotNone(conditional)
         self.assertEqual(conditional.answer, "No")
+        modus_ponens = solve_logic(
+            "If the alarm is armed, the light is green. The alarm is armed. "
+            "Is the light green?"
+        )
+        self.assertIsNotNone(modus_ponens)
+        self.assertEqual(modus_ponens.answer, "Yes")
         universal = solve_logic(
             "Logical deduction: All red keys open the vault. Key A is red. "
             "Does Key A open the vault?"
@@ -412,6 +463,30 @@ class LocalSolverTests(unittest.TestCase):
             "accounts/fireworks/models/minimax-m3",
         )
 
+    def test_model_answer_validation_checks_python_and_summary_constraints(self) -> None:
+        validate_model_answer(
+            "def square(n):\n    return n * n",
+            "code_generation",
+            "Write a Python function square(n).",
+        )
+        with self.assertRaises(FireworksError):
+            validate_model_answer(
+                "def square(:\n    pass",
+                "code_generation",
+                "Write a Python function square(n).",
+            )
+        validate_model_answer(
+            "- First item.\n- Second item.",
+            "summarization",
+            "Summarize in two bullet points: text",
+        )
+        with self.assertRaises(FireworksError):
+            validate_model_answer(
+                "Only one line.",
+                "summarization",
+                "Summarize in two bullet points: text",
+            )
+
     def test_remote_category_uses_injected_client(self) -> None:
         solved = solve_prompt("What is the capital city of Japan?", client=FakeFireworksClient())
         self.assertEqual(solved.category, "factual_qa")
@@ -440,6 +515,29 @@ class LocalSolverTests(unittest.TestCase):
             client.models,
             ["accounts/fireworks/models/minimax-m3", "accounts/fireworks/models/gemma-4-26b-a4b-it"],
         )
+
+    def test_fireworks_retries_invalid_generated_python(self) -> None:
+        class ValidationRetryClient(FireworksClient):
+            def __init__(self) -> None:
+                super().__init__(
+                    api_key="test",
+                    base_url="https://api.fireworks.ai/inference/v1",
+                    allowed_models=["kimi-k2p7-code", "minimax-m3"],
+                )
+                self.models: list[str] = []
+
+            def _post_json(self, path, payload):  # type: ignore[no-untyped-def]
+                self.models.append(payload["model"])
+                if payload["model"].endswith("kimi-k2p7-code"):
+                    content = "```python\ndef broken(:\n    pass\n```"
+                else:
+                    content = "```python\ndef square(n):\n    return n * n\n```"
+                return {"choices": [{"message": {"content": content}}]}
+
+        client = ValidationRetryClient()
+        answer = client.solve("Write a Python function square(n).", "code_generation")
+        self.assertEqual(answer, "def square(n):\n    return n * n")
+        self.assertEqual(len(client.models), 2)
 
     def test_batch_contract_preserves_order_and_writes_strings(self) -> None:
         tasks = [

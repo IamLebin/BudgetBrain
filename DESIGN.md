@@ -36,7 +36,8 @@ become your evidence log, not just a plan.
 
 ## 4. Summarization
 - **Detection**: long input text, "summarize" instruction.
-- **Strategy**: no reliable local method for good summaries — route to Fireworks.
+- **Strategy**: restructure an exact matching set of short source sentences into requested
+  bullet points locally; route all abstractive, compressed, or ambiguous summaries to Fireworks.
 - **Model**: `kimi-k2p7-code` first, with MiniMax fallback and a tight completion cap.
 - **Prompt**: explicit target length/format to avoid the model over-generating.
 - Live validation: exact sentence and bullet/word-limit variants pass at `73-101`
@@ -49,7 +50,8 @@ become your evidence log, not just a plan.
   held-out NER needs more coverage.
 - **Model (fallback)**: only if regex confidence is low or the expected schema is more complex.
 - Validation: people, titled people, organizations, locations, absolute dates, and relative
-  dates pass locally. Unresolved capitalized spans lower confidence and trigger model fallback.
+  dates pass locally, including geographic prefixes and common organization suffixes.
+  Unresolved capitalized spans lower confidence and trigger model fallback.
 
 ## 6. Code debugging
 - **Detection**: input contains a code block, possibly a traceback/error message.
@@ -105,21 +107,26 @@ become your evidence log, not just a plan.
    local accuracy bar.
 
 ## Current validation snapshot
-- Unit tests: `39/39` passing.
+- Unit tests: `44/44` passing.
 - Offline fixtures: baseline `8/8`, official practice `8/8`, held-out `16/16`, local champion
-  `12/12` with zero model calls, and reasoning stress `8/8` with two model calls.
-- Final live official-practice run: `8/8`, three Fireworks calls, `251` tokens.
-- Final live held-out run: `16/16`, seven Fireworks calls, `483` tokens.
+  `17/17` with zero model calls, and reasoning stress `8/8` with two model calls.
+- V3 live official-practice run: `8/8`, three Fireworks calls, `256` tokens.
+- V3 live held-out run: `16/16`, five Fireworks calls, `362` tokens; the v2 route used
+  seven calls and `483` tokens.
+- V3 Docker held-out run: `16/16`, five Fireworks calls, `366` tokens.
 - Final reasoning-stress Docker run: `8/8`, two Fireworks calls, `262` tokens; the prior
   implementation used `1,497` tokens on the same prompts.
 - Official accuracy gate: `80%`; real eval has `19` tasks, so clear target is at least
   `16/19` correct.
-- Local zero-token paths currently cover arithmetic and structured word math, lexicon
-  sentiment, regex NER, assignment/ordering/implication logic, and safe Python repairs.
+- Local zero-token paths currently cover arithmetic and structured word math, lexicon and
+  factual-neutral sentiment, regex NER, safe short bullet summaries,
+  assignment/ordering/implication logic, and safe Python repairs.
+- Remote answers are validated for Python syntax, summary bullet/word constraints, and
+  requested NER JSON before accepting them; invalid outputs fall back to the next allowed model.
 - Live Fireworks validation works after normalizing shorthand model names to full Fireworks
   model IDs such as `accounts/fireworks/models/minimax-m3`.
-- Docker image `budgetbrain-track1:champion-v2` builds and runs as `linux/amd64`; Docker content
-  size is `45,525,751` bytes, comfortably under the `10GB` compressed-size limit.
+- Docker image `budgetbrain-track1:champion-v3` builds and runs as `linux/amd64`; Docker content
+  size is `45,527,782` bytes, comfortably under the `10GB` compressed-size limit.
 - Grading environment: `4 GB RAM`, `2 vCPU`.
 - Failure statuses from the updated guide to watch for: `PULL_ERROR`, `RUNTIME_ERROR`,
   `TIMEOUT`, `INVALID_RESULTS_SCHEMA`, `MODEL_VIOLATION`, `IMAGE_TOO_LARGE`,

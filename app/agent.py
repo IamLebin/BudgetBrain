@@ -10,6 +10,7 @@ from solvers.logic_solver import solve_logic
 from solvers.math_solver import solve_math
 from solvers.ner_solver import solve_ner
 from solvers.sentiment_solver import solve_sentiment
+from solvers.summarization_solver import solve_summarization
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,7 @@ class SolveResult:
 LOCAL_SOLVERS = {
     "math": solve_math,
     "sentiment": solve_sentiment,
+    "summarization": solve_summarization,
     "ner": solve_ner,
     "logic": solve_logic,
     "code_debugging": solve_code_debug,

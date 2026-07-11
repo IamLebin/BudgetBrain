@@ -88,9 +88,7 @@ def _solve_conditional_deduction(prompt: str) -> LocalAnswer | None:
     question_match = re.search(r"([^.?]+)\?\s*$", tail.strip())
     if question_match is None:
         return None
-    question = _question_proposition(question_match.group(1))
-    if question is None:
-        return None
+    question_text = _normalize_proposition(question_match.group(1))
 
     facts_text = tail[: question_match.start()]
     facts = [
@@ -104,9 +102,9 @@ def _solve_conditional_deduction(prompt: str) -> LocalAnswer | None:
         positive, is_negative = _remove_negation(fact)
         (negative_facts if is_negative else positive_facts).add(positive)
 
-    if question == consequent and antecedent in positive_facts:
+    if _question_matches_proposition(question_text, consequent) and antecedent in positive_facts:
         return LocalAnswer("Yes", 0.99, "modus_ponens")
-    if question == antecedent and consequent in negative_facts:
+    if _question_matches_proposition(question_text, antecedent) and consequent in negative_facts:
         return LocalAnswer("No", 0.99, "modus_tollens")
     return None
 
@@ -176,6 +174,20 @@ def _question_proposition(question: str) -> str | None:
     if does_question:
         return _normalize_proposition(does_question.group(1))
     return None
+
+
+def _question_matches_proposition(question: str, proposition: str) -> bool:
+    direct = _question_proposition(question)
+    if direct == proposition or question == proposition:
+        return True
+    for copula in ("is", "are"):
+        marker = f" {copula} "
+        if marker not in proposition:
+            continue
+        subject, predicate = proposition.split(marker, maxsplit=1)
+        if question == f"{copula} {subject} {predicate}":
+            return True
+    return False
 
 
 def _solve_one_to_one_assignment(prompt: str) -> LocalAnswer | None:

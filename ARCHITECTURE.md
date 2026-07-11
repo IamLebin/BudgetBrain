@@ -47,7 +47,7 @@ a wrong "free" answer still fails the accuracy gate.
 | Sentiment | Lexicon/rule-based scoring | custom lexicon |
 | Logic puzzles | Assignments, ordering, implication, truth puzzles | custom parser |
 | Factual Q&A | Usually **not** locally solvable — route to model | — |
-| Summarization | Usually **not** locally solvable — route to model | — |
+| Summarization | Short sentence-to-bullet restructuring; otherwise model | pure Python `re` |
 | Code debugging | Syntax, extrema, index, mutable-default repairs | pure Python `ast`, `re` |
 | Code generation | Not locally solvable — route to model | — |
 
@@ -71,6 +71,8 @@ a wrong "free" answer still fails the accuracy gate.
   empty-content, or malformed model responses without calling a model outside the allow-list.
 - Normalize Markdown code fences, sentiment labels, yes/no conclusions, and math final-answer
   lines before writing the result.
+- Validate generated Python syntax, requested summary limits, and requested NER JSON locally;
+  retry the next allowed model only when the first output is structurally invalid.
 - Central token counter/logger so you can see running token spend during local testing.
 
 ### 4. Batch Entry Point (`app/main.py`)

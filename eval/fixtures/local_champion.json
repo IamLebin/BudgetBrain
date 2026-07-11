@@ -82,5 +82,40 @@
     "prompt": "This function raises IndexError instead of returning the last value. Fix the bug:\n```python\ndef final(values):\n    return values[len(values)]\n```",
     "contains": ["def final", "values[-1]"],
     "requires_fireworks": false
+  },
+  {
+    "task_id": "local-factual-neutral",
+    "category": "sentiment",
+    "prompt": "Classify as positive, negative, or neutral: The package arrived on Tuesday as scheduled.",
+    "expected": "neutral",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-contracted-negation",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment: I don't think this is good.",
+    "expected": "negative",
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-short-bullets",
+    "category": "summarization",
+    "prompt": "Summarize this update in two bullet points: The patch fixes startup failures on older systems. It also improves upload speed and error reporting.",
+    "contains": ["startup", "upload", "error"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-location-prefix",
+    "category": "ner",
+    "prompt": "Extract named entities and types from: Maya Chen climbed Mount Everest in May 2026.",
+    "contains": ["Maya Chen", "PERSON", "Mount Everest", "LOCATION", "May 2026", "DATE"],
+    "requires_fireworks": false
+  },
+  {
+    "task_id": "local-org-suffix",
+    "category": "ner",
+    "prompt": "Extract named entities and types from: The European Union met Lina Park in Brussels.",
+    "contains": ["European Union", "ORG", "Lina Park", "PERSON", "Brussels", "LOCATION"],
+    "requires_fireworks": false
   }
 ]

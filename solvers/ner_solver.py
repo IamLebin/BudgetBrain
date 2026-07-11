@@ -10,11 +10,14 @@ ORG_SUFFIXES = {
     "AI",
     "Agency",
     "Association",
+    "Authority",
     "Bank",
     "Center",
     "Centre",
     "College",
     "Company",
+    "Commission",
+    "Committee",
     "Corp",
     "Corporation",
     "Council",
@@ -28,11 +31,15 @@ ORG_SUFFIXES = {
     "Ltd",
     "Ministry",
     "Museum",
+    "Nations",
+    "Network",
     "Organization",
+    "Organisation",
     "School",
     "Systems",
     "Technologies",
     "Times",
+    "Union",
     "University",
 }
 
@@ -68,6 +75,13 @@ LOCATION_SUFFIXES = {
     "State",
     "Street",
     "Valley",
+}
+
+LOCATION_PREFIXES = {
+    "Fort",
+    "Lake",
+    "Mount",
+    "Port",
 }
 
 PERSON_TITLES = {
@@ -256,7 +270,7 @@ def _label_name(source: str, start: int, value: str) -> str | None:
         return "LOCATION"
     if words[-1] in ORG_SUFFIXES or value.isupper() or (len(words) == 1 and _has_internal_capital(value)):
         return "ORG"
-    if words[-1] in LOCATION_SUFFIXES:
+    if words[0] in LOCATION_PREFIXES or words[-1] in LOCATION_SUFFIXES:
         return "LOCATION"
     if len(words) >= 2:
         return "PERSON"

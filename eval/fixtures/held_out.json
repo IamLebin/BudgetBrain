@@ -43,7 +43,7 @@
     "contains": [],
     "contains_any": ["neutral", "positive"],
     "fake_answer": "neutral",
-    "requires_fireworks": true
+    "requires_fireworks": false
   },
   {
     "task_id": "summary-length",
@@ -59,7 +59,7 @@
     "prompt": "Summarize this update in two bullet points: The release fixes login failures on older phones. It also reduces image upload time and adds clearer error messages.",
     "contains": ["login", "upload", "error"],
     "fake_answer": "- Fixes login failures on older phones.\n- Speeds image uploads and improves error messages.",
-    "requires_fireworks": true
+    "requires_fireworks": false
   },
   {
     "task_id": "ner-title",

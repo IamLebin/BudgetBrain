@@ -87,15 +87,16 @@ contract above and avoid hardcoded/cached answers.
 - Docker image builds, runs, and is pullable clean on a fresh machine
 - No category silently fails or times out
 
-## Current competitive target (July 11, 2026 leaderboard snapshot)
-- Public Track 1 leader: `1,377` tokens at `89.5%` (`17/19`).
-- Best visible 100% result: `2,616` tokens.
-- Our final official-practice live run: `8/8`, `251` Fireworks tokens, with five tasks
+## Current competitive target (July 11, 2026, 21:01 leaderboard snapshot)
+- Public Track 1 leader: `1,797` tokens at `94.7%` (`18/19`).
+- Best visible 100% result: `3,753` tokens.
+- Our v3 official-practice live run: `8/8`, `256` Fireworks tokens, with five tasks
   solved locally.
-- Our final reasoning-stress Docker run: `8/8`, `262` Fireworks tokens, with six tasks
+- Our v3 reasoning-stress live run: `8/8`, `262` Fireworks tokens, with six tasks
   solved locally and only two model calls.
-- Our final held-out live run: `16/16` at `483` Fireworks tokens.
+- Our v3 held-out Docker run: `16/16` at `366` Fireworks tokens, with eleven tasks
+  solved locally and five model calls.
 - Optimized public image: `lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2`.
 
 Leaderboard values can move before the deadline; the implementation target is therefore
-`>=16/19` accuracy and comfortably below `1,377` tokens, not merely matching the snapshot.
+`>=18/19` accuracy and comfortably below `1,797` tokens, not merely clearing the gate.
