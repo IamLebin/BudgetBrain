@@ -78,6 +78,7 @@ class FireworksClient:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.allowed_models = allowed_models
+        self.last_tokens_used: int | None = None
 
     @classmethod
     def from_env(cls) -> "FireworksClient":
@@ -91,6 +92,7 @@ class FireworksClient:
         return cls(api_key=api_key, base_url=base_url, allowed_models=allowed)
 
     def solve(self, prompt: str, category: str) -> str:
+        self.last_tokens_used = None
         errors: list[str] = []
         for model in self.candidate_models(category):
             api_model = model_id_for_request(model, self.base_url)
@@ -108,6 +110,7 @@ class FireworksClient:
                 payload["reasoning_effort"] = reasoning_effort
             try:
                 response = self._post_json("/chat/completions", payload)
+                self._record_usage(response.get("usage"))
                 self._log_usage(category, api_model, response.get("usage"))
                 content = _response_content(response)
                 if _response_was_truncated(response):
@@ -186,6 +189,14 @@ class FireworksClient:
                 f"usage category={category} model={model} total={total} prompt={prompt} completion={completion}",
                 file=sys.stderr,
             )
+
+    def _record_usage(self, usage: Any) -> None:
+        if not isinstance(usage, dict):
+            return
+        total = usage.get("total_tokens")
+        if isinstance(total, bool) or not isinstance(total, int) or total < 0:
+            return
+        self.last_tokens_used = (self.last_tokens_used or 0) + total
 
 
 def parse_allowed_models(raw: str) -> list[str]:
