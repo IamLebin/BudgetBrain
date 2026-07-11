@@ -748,6 +748,31 @@ class LocalSolverTests(unittest.TestCase):
         self.assertEqual(answer, "def square(n):\n    return n * n")
         self.assertEqual(len(client.models), 2)
 
+    def test_fireworks_tracks_tokens_across_retries(self) -> None:
+        class UsageClient(FireworksClient):
+            def __init__(self) -> None:
+                super().__init__(
+                    api_key="test",
+                    base_url="https://api.fireworks.ai/inference/v1",
+                    allowed_models=["kimi-k2p7-code", "minimax-m3"],
+                )
+                self.calls = 0
+
+            def _post_json(self, path, payload):  # type: ignore[no-untyped-def]
+                self.calls += 1
+                content = "def broken(:\n    pass" if self.calls == 1 else "def square(n):\n    return n * n"
+                return {
+                    "choices": [{"message": {"content": content}}],
+                    "usage": {"total_tokens": 10 if self.calls == 1 else 7},
+                }
+
+        client = UsageClient()
+        self.assertEqual(
+            client.solve("Write a Python function square(n).", "code_generation"),
+            "def square(n):\n    return n * n",
+        )
+        self.assertEqual(client.last_tokens_used, 17)
+
     def test_fireworks_retries_truncated_answers(self) -> None:
         class TruncationRetryClient(FireworksClient):
             def __init__(self) -> None:

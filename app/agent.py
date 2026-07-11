@@ -21,6 +21,7 @@ class SolveResult:
     answer: str
     category: str
     source: str
+    tokens_used: int | None = None
 
 
 LOCAL_SOLVERS = {
@@ -99,8 +100,10 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
                 answer=_format_local_answer(prompt, classification.category, local.method, local.answer),
                 category=classification.category,
                 source=f"local:{local.method}",
+                tokens_used=0,
             )
 
+    fireworks_client: FireworksClient | None = None
     try:
         fireworks_client = client or FireworksClient.from_env()
         answer = fireworks_client.solve(prompt, classification.category)
@@ -108,6 +111,7 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
             answer=answer.strip(),
             category=classification.category,
             source="fireworks",
+            tokens_used=getattr(fireworks_client, "last_tokens_used", None),
         )
     except FireworksError as exc:
         print(
@@ -118,6 +122,11 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
             answer=_last_resort_answer(prompt, classification.category),
             category=classification.category,
             source="fallback",
+            tokens_used=(
+                getattr(fireworks_client, "last_tokens_used", None)
+                if fireworks_client is not None
+                else None
+            ),
         )
 
 

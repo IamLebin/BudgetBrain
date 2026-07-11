@@ -78,6 +78,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 "is_local": is_local,
                 "method": method,
                 "confidence": clf.confidence,
+                "tokens_used": result.tokens_used,
             })
         except Exception as exc:  # noqa: BLE001
             self._json({"error": str(exc)}, 500)
