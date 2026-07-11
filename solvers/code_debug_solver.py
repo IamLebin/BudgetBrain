@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 import re
 
 from solvers.common import LocalAnswer
@@ -11,10 +12,17 @@ def solve_code_debug(prompt: str) -> LocalAnswer | None:
     if not code:
         return None
 
-
     extremum = _repair_extremum_function(prompt, code)
     if extremum is not None:
         return LocalAnswer(extremum, 0.98, "extremum_repair")
+
+    mutable_default = _repair_mutable_default(prompt, code)
+    if mutable_default is not None:
+        return LocalAnswer(mutable_default, 0.99, "mutable_default_repair")
+
+    index = _repair_len_index(prompt, code)
+    if index is not None:
+        return LocalAnswer(index, 0.99, "len_index_repair")
 
     try:
         ast.parse(code)
@@ -71,6 +79,84 @@ def _repair_extremum_function(prompt: str, code: str) -> str | None:
     if not fixed_element:
         return None
     return f"def {function_name}({parameter}):\n    return {builtin}({parameter})"
+
+
+def _repair_mutable_default(prompt: str, code: str) -> str | None:
+    if not re.search(r"\bmutable[- ]default\b|\bmutable\b.{0,30}\bdefault\b", prompt, re.I):
+        return None
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return None
+    functions = [node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    if len(functions) != 1:
+        return None
+    function = functions[0]
+    positional = [*function.args.posonlyargs, *function.args.args]
+    default_args = positional[len(positional) - len(function.args.defaults) :]
+    repairs: list[tuple[str, ast.expr]] = []
+    for argument, default in zip(default_args, function.args.defaults):
+        factory = _mutable_factory(default)
+        if factory is None:
+            continue
+        repairs.append((argument.arg, factory))
+    if not repairs:
+        return None
+
+    for index, (argument, _) in enumerate(zip(default_args, function.args.defaults)):
+        if any(argument.arg == name for name, _ in repairs):
+            function.args.defaults[index] = ast.Constant(value=None)
+    guards: list[ast.stmt] = []
+    for name, factory in repairs:
+        guards.append(
+            ast.If(
+                test=ast.Compare(
+                    left=ast.Name(id=name, ctx=ast.Load()),
+                    ops=[ast.Is()],
+                    comparators=[ast.Constant(value=None)],
+                ),
+                body=[
+                    ast.Assign(
+                        targets=[ast.Name(id=name, ctx=ast.Store())],
+                        value=factory,
+                    )
+                ],
+                orelse=[],
+            )
+        )
+    function.body = guards + function.body
+    ast.fix_missing_locations(tree)
+    return ast.unparse(tree)
+
+
+def _mutable_factory(default: ast.expr) -> ast.expr | None:
+    if isinstance(default, (ast.List, ast.Dict, ast.Set)):
+        return copy.deepcopy(default)
+    if (
+        isinstance(default, ast.Call)
+        and isinstance(default.func, ast.Name)
+        and default.func.id in {"list", "dict", "set"}
+        and not default.args
+        and not default.keywords
+    ):
+        return copy.deepcopy(default)
+    return None
+
+
+def _repair_len_index(prompt: str, code: str) -> str | None:
+    if not re.search(r"\bindexerror\b|\b(?:return|get|find)\s+(?:the\s+)?last\b", prompt, re.I):
+        return None
+    pattern = re.compile(
+        r"(?P<container>\b[A-Za-z_]\w*)\s*\[\s*len\s*\(\s*(?P=container)\s*\)\s*\]"
+    )
+    repaired, count = pattern.subn(r"\g<container>[-1]", code)
+    if count != 1:
+        return None
+    try:
+        ast.parse(repaired)
+    except SyntaxError:
+        return None
+    return repaired
 
 
 def _repair_missing_colons(code: str) -> str:

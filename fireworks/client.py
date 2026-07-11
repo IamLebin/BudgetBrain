@@ -20,36 +20,36 @@ DEFAULT_MODELS = (
 )
 
 MODEL_PREFERENCE = {
-    "factual_qa": ("minimax-m3", "gemma-4-26b-a4b-it", "gemma-4-31b-it-nvfp4"),
+    "factual_qa": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "math": ("minimax-m3", "gemma-4-26b-a4b-it", "gemma-4-31b-it-nvfp4"),
-    "sentiment": ("minimax-m3", "gemma-4-26b-a4b-it"),
-    "summarization": ("minimax-m3", "gemma-4-26b-a4b-it", "gemma-4-31b-it-nvfp4"),
-    "ner": ("minimax-m3", "gemma-4-26b-a4b-it"),
+    "sentiment": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
+    "summarization": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
+    "ner": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "code_debugging": ("kimi-k2p7-code", "minimax-m3", "gemma-4-31b-it-nvfp4"),
     "logic": ("minimax-m3", "gemma-4-26b-a4b-it", "gemma-4-31b-it-nvfp4"),
     "code_generation": ("kimi-k2p7-code", "minimax-m3", "gemma-4-31b-it-nvfp4"),
 }
 
 MAX_TOKENS = {
-    "factual_qa": 128,
-    "math": 80,
-    "sentiment": 48,
-    "summarization": 180,
-    "ner": 180,
-    "code_debugging": 320,
-    "logic": 160,
-    "code_generation": 520,
+    "factual_qa": 96,
+    "math": 64,
+    "sentiment": 32,
+    "summarization": 160,
+    "ner": 160,
+    "code_debugging": 240,
+    "logic": 96,
+    "code_generation": 320,
 }
 
 SYSTEM_PROMPTS = {
-    "factual_qa": "Answer every part in one short sentence. Give the standard specific answer only.",
-    "math": "Solve accurately. Output only the final answer unless reasoning is requested.",
-    "sentiment": "Return only the requested label unless justification is explicitly requested.",
-    "summarization": "Obey every length and format constraint. Output only the summary.",
-    "ner": "Preserve entity text and label types. Use only the requested format.",
-    "code_debugging": "Return a correct fixed implementation; explain only if requested.",
-    "logic": "Satisfy every constraint. Return only the requested name, value, or yes/no conclusion.",
-    "code_generation": "Return minimal correct code only, without docstrings or explanatory comments.",
+    "factual_qa": "Answer every part in one concise sentence using standard key terms.",
+    "math": "Return only the final answer unless steps are requested.",
+    "sentiment": "Return only the requested label unless a reason is requested.",
+    "summarization": "Follow all constraints; output only the summary.",
+    "ner": "Return all entities in the requested format.",
+    "code_debugging": "Return only corrected code unless an explanation is requested.",
+    "logic": "Return only the requested conclusion unless reasoning is requested.",
+    "code_generation": "Return only minimal correct code; prefer built-ins when possible.",
 }
 
 
@@ -231,22 +231,18 @@ def _reasoning_effort(model: str, category: str, prompt: str) -> str | None:
         if category in {"math", "code_debugging", "code_generation"}:
             return "low"
         return "none"
-    if model_name == "kimi-k2p7-code" and category in {"code_debugging", "code_generation"}:
-        hard_signals = (
-            "dynamic programming",
-            "concurrent",
-            "thread-safe",
-            "asynchronous",
-            "optimize",
-            "complexity",
-            "graph",
-            "interval",
-            "recursion",
-            "tree",
-            "parser",
-        )
-        if len(prompt.split()) > 120 or any(signal in prompt.lower() for signal in hard_signals):
-            return "low"
+    if model_name == "kimi-k2p7-code":
+        if category in {"code_debugging", "code_generation"}:
+            hard_signals = (
+                "dynamic programming",
+                "concurrent",
+                "thread-safe",
+                "asynchronous",
+                "graph",
+                "parser",
+            )
+            if len(prompt.split()) > 160 or any(signal in prompt.lower() for signal in hard_signals):
+                return "low"
         return "none"
     return None
 

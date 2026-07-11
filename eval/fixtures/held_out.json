@@ -109,7 +109,8 @@
     "task_id": "code-palindrome",
     "category": "code_generation",
     "prompt": "Write a Python function is_palindrome(text) that ignores case and non-alphanumeric characters.",
-    "contains": ["def is_palindrome", "isalnum", "lower"],
+    "contains": ["def is_palindrome", "lower"],
+    "contains_any": ["isalnum", "re.sub"],
     "fake_answer": "def is_palindrome(text):\n    cleaned = ''.join(c.lower() for c in text if c.isalnum())\n    return cleaned == cleaned[::-1]",
     "requires_fireworks": true
   },

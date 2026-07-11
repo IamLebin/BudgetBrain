@@ -42,13 +42,13 @@ a wrong "free" answer still fails the accuracy gate.
 
 | Category | Local strategy | Library |
 |---|---|---|
-| Math reasoning | Parse safe arithmetic expressions, percentages | pure Python `ast`, `fractions` |
+| Math reasoning | Arithmetic, percentages, ratios, weighted speed | pure Python `ast`, `fractions` |
 | NER | Regex extraction for dates, URLs, emails, capitalized people/orgs/locations | pure Python `re` |
 | Sentiment | Lexicon/rule-based scoring | custom lexicon |
-| Logic puzzles | Small deterministic subset | custom parser |
+| Logic puzzles | Assignments, ordering, implication, truth puzzles | custom parser |
 | Factual Q&A | Usually **not** locally solvable — route to model | — |
 | Summarization | Usually **not** locally solvable — route to model | — |
-| Code debugging | Static checks (syntax errors via `ast`) catch a subset; deeper bugs need model | `ast`, `pylint` |
+| Code debugging | Syntax, extrema, index, mutable-default repairs | pure Python `ast`, `re` |
 | Code generation | Not locally solvable — route to model | — |
 
 ### 3. Fireworks Client (`fireworks/client.py`)
@@ -59,6 +59,8 @@ a wrong "free" answer still fails the accuracy gate.
   - A conservative `max_tokens` cap
 - Model routing prefers non-Gemma defaults first because Gemma is on-demand and can return
   404 if not deployed. Gemma remains an allowed fallback/bonus path when explicitly available.
+- Live token tests route concise factual, summarization, sentiment, NER, and code tasks to
+  `kimi-k2p7-code`; complex math and logic retain `minimax-m3` as the accuracy-first fallback.
 - If a selected model returns an availability-style HTTP error, try the next allowed model
   instead of failing the whole task.
 - Preserve the exact model IDs injected by `ALLOWED_MODELS` when using the judging proxy.

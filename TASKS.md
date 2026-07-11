@@ -31,6 +31,9 @@ Current after the latest Discord/guide clarification.
 - [x] Broaden NER entity/date handling and confidence fallback
 - [x] Broaden logic puzzle coverage with one-to-one assignments
 - [x] Broaden code-debugging to return corrected implementations for safe local repairs
+- [x] Solve sequential percentages, ratio shares, and weighted average speed locally
+- [x] Solve unique ordering, modus tollens, and simple universal deduction locally
+- [x] Repair mutable defaults and `sequence[len(sequence)]` locally with safety gates
 
 ## 3. Fireworks Client
 - [x] Per-category model preferences
@@ -53,14 +56,16 @@ Current after the latest Discord/guide clarification.
 - [x] Track live token usage per category
 - [x] Import all 8 official practice tasks from the updated guide
 - [x] Add 16 held-out variants and 8 reasoning stress tasks
-- [x] Final live official Docker run passes `8/8` with `446` Fireworks tokens
-- [x] Final live reasoning stress run passes `8/8` with `1,497` Fireworks tokens
+- [x] Final live official run passes `8/8` with `251` Fireworks tokens
+- [x] Final live held-out run passes `16/16` with `483` Fireworks tokens
+- [x] Final Docker reasoning stress run passes `8/8` with `262` Fireworks tokens
+- [x] Add 12 zero-token local champion variants and 51 generated safety/property checks
 
 ## 5. Docker
 - [x] Dockerfile builds as `linux/amd64`
 - [x] Image is far under `10GB`
 - [x] Container reads `/input/tasks.json` and writes `/output/results.json`
-- [x] Final image `budgetbrain-track1:champion` is `linux/amd64`, `45,522,179` bytes
+- [x] Final local candidate `budgetbrain-track1:champion-v2` is `linux/amd64`, `45,525,751` bytes
 - [x] Push immutable image to public Docker Hub registry
 - [x] Confirm anonymous `linux/amd64` manifest access and pull work
 
@@ -81,3 +86,7 @@ Current after the latest Discord/guide clarification.
 - [x] Public repository and anonymous pull verified
 - [x] Published digest recorded as
   `sha256:bb74ac8bf2d2c089a236f578ef82e10e0a9316430fc8f2293bf23468badfedc6`
+- [x] Push optimized candidate as
+  `lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2`
+- [x] Verify the optimized tag with an anonymous `linux/amd64` pull
+- [ ] Update the submission form to the optimized immutable tag
