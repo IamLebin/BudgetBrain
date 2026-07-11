@@ -66,10 +66,11 @@ docker run --rm --platform linux/amd64 \
   budgetbrain-track1:local
 ```
 
-The optimized final image is `budgetbrain-track1:champion-v2`, is `linux/amd64`, and has
-Docker content size `45,525,751` bytes. Final live validation produced `8/8` official answers
-at 251 tokens, `16/16` held-out answers at 483 tokens, and `8/8` Docker reasoning-stress
-answers at 262 tokens.
+The latest local candidate is `budgetbrain-track1:champion-v3`, is `linux/amd64`, and has
+Docker content size `45,527,782` bytes. V3 validation produced `8/8` official answers at
+256 tokens, `16/16` held-out answers at 362 tokens (`366` inside Docker), and `8/8`
+reasoning-stress answers at 262 tokens. The public v2 remains the submission image until v3
+receives a new immutable tag.
 
 Published immutable public submission image:
 

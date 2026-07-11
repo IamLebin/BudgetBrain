@@ -25,13 +25,17 @@ POSITIVE = {
     "helpful",
     "impressive",
     "intuitive",
+    "like",
+    "liked",
     "love",
     "loved",
     "perfect",
     "pleasant",
     "powerful",
+    "quick",
     "recommend",
     "reliable",
+    "responsive",
     "satisfied",
     "smooth",
     "stable",
@@ -53,6 +57,8 @@ NEGATIVE = {
     "difficult",
     "disappointing",
     "disappointed",
+    "defective",
+    "delayed",
     "expensive",
     "fail",
     "failed",
@@ -62,8 +68,11 @@ NEGATIVE = {
     "hate",
     "hated",
     "horrible",
+    "inaccurate",
     "laggy",
     "limited",
+    "late",
+    "mediocre",
     "poor",
     "problem",
     "problems",
@@ -74,13 +83,30 @@ NEGATIVE = {
     "slow",
     "stuck",
     "terrible",
+    "underwhelming",
     "unhappy",
     "unreliable",
     "useless",
     "worst",
 }
 
-NEGATORS = {"not", "never", "no", "hardly", "barely"}
+NEGATORS = {
+    "not",
+    "never",
+    "no",
+    "hardly",
+    "barely",
+    "don't",
+    "doesn't",
+    "didn't",
+    "isn't",
+    "wasn't",
+    "weren't",
+    "can't",
+    "couldn't",
+    "wouldn't",
+    "shouldn't",
+}
 
 
 def solve_sentiment(prompt: str) -> LocalAnswer | None:
@@ -109,6 +135,8 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
                 negative_hits += 1
     hits = positive_hits + negative_hits
     if hits == 0:
+        if _looks_clearly_factual(text):
+            return LocalAnswer("neutral", 0.92, "factual_neutral")
         return LocalAnswer("neutral", 0.72, "lexicon")
     if positive_hits and negative_hits:
         constrained_three_way = bool(
@@ -128,7 +156,7 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
 
 
 def _is_negated(tokens: list[str], index: int) -> bool:
-    start = max(0, index - 3)
+    start = max(0, index - 4)
     for negator_index in range(start, index):
         if tokens[negator_index] not in NEGATORS:
             continue
@@ -142,4 +170,27 @@ def _is_negated(tokens: list[str], index: int) -> bool:
 def _strip_instruction(prompt: str) -> str:
     quoted = re.findall(r'"([^"]+)"|\'([^\']+)\'', prompt)
     pieces = [a or b for a, b in quoted if a or b]
-    return pieces[-1] if pieces else prompt
+    if pieces:
+        return pieces[-1]
+    parts = re.split(r":\s*", prompt, maxsplit=1)
+    return parts[-1]
+
+
+def _looks_clearly_factual(text: str) -> bool:
+    lower = text.lower()
+    if "!" in text or re.search(r"\b(?:but|however|although|unfortunately|fortunately)\b", lower):
+        return False
+    if re.search(r"\b(?:i|we)\s+(?:feel|felt|think|thought|wish|hope)\b", lower):
+        return False
+    temporal = re.search(
+        r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+        r"january|february|march|april|may|june|july|august|september|october|"
+        r"november|december|today|yesterday|tomorrow|\d{1,4})\b",
+        lower,
+    )
+    factual_verb = re.search(
+        r"\b(?:arrived|began|closed|contains|delivered|ended|lasted|located|measures|"
+        r"met|occurred|opened|released|reported|scheduled|shipped|weighs)\b",
+        lower,
+    )
+    return bool(temporal and factual_verb)

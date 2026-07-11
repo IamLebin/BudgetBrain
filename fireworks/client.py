@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -96,7 +97,9 @@ class FireworksClient:
                 response = self._post_json("/chat/completions", payload)
                 self._log_usage(category, api_model, response.get("usage"))
                 content = _response_content(response)
-                return clean_model_answer(content, category, prompt)
+                answer = clean_model_answer(content, category, prompt)
+                validate_model_answer(answer, category, prompt)
+                return answer
             except (KeyError, IndexError, TypeError) as exc:
                 wrapped = FireworksError(
                     f"unexpected Fireworks response shape: {exc}",
@@ -109,7 +112,7 @@ class FireworksClient:
                 if not _should_try_next_model(exc):
                     raise
                 errors.append(f"{api_model}: {exc}")
-                print(f"model unavailable, trying next: {api_model} ({exc})", file=sys.stderr)
+                print(f"model failed, trying next: {api_model} ({exc})", file=sys.stderr)
         raise FireworksError("all candidate Fireworks models failed: " + "; ".join(errors))
 
     def pick_model(self, category: str) -> str:
@@ -257,6 +260,10 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
         )
         if fenced:
             answer = fenced.group(1).strip()
+    if category == "ner" and re.search(r"\bjson\b", prompt, re.I):
+        fenced_json = re.fullmatch(r"```(?:json)?\s*\n?(.*?)\n?```", answer, flags=re.I | re.S)
+        if fenced_json:
+            answer = fenced_json.group(1).strip()
     if category == "math" and not re.search(
         r"\b(explain|steps?|reasoning|derive)\b|\bshow\s+(?:your\s+)?work\b",
         prompt,
@@ -284,6 +291,69 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
         if yes_no:
             return yes_no.group(1).capitalize()
     return answer
+
+
+def validate_model_answer(answer: str, category: str, prompt: str) -> None:
+    if category in {"code_generation", "code_debugging"} and _expects_python(prompt, answer):
+        try:
+            ast.parse(answer)
+        except SyntaxError as exc:
+            raise FireworksError(f"model returned invalid Python: {exc.msg}", status_code=502) from exc
+
+    if category == "summarization":
+        bullet_request = re.search(
+            r"\b(?P<count>[1-5]|one|two|three|four|five)\s+bullet\s+points?\b",
+            prompt,
+            re.I,
+        )
+        if bullet_request is not None:
+            expected = _small_number(bullet_request.group("count"))
+            bullets = [
+                line
+                for line in answer.splitlines()
+                if re.match(r"^\s*(?:[-*•]|\d+[.)])\s+\S", line)
+            ]
+            if len(bullets) != expected:
+                raise FireworksError(
+                    f"model returned {len(bullets)} bullets; expected {expected}",
+                    status_code=502,
+                )
+        word_limit = re.search(
+            r"\b(?:no\s+more\s+than|at\s+most|maximum\s+of)\s+(\d+)\s+words?\b",
+            prompt,
+            re.I,
+        )
+        if word_limit is not None:
+            words = re.findall(r"\b[\w'-]+\b", answer)
+            if len(words) > int(word_limit.group(1)):
+                raise FireworksError(
+                    f"model exceeded {word_limit.group(1)}-word limit",
+                    status_code=502,
+                )
+
+    if category == "ner" and re.search(r"\bjson\b", prompt, re.I):
+        try:
+            parsed = json.loads(answer)
+        except json.JSONDecodeError as exc:
+            raise FireworksError("model returned invalid NER JSON", status_code=502) from exc
+        if not isinstance(parsed, (list, dict)):
+            raise FireworksError("model returned unsupported NER JSON", status_code=502)
+
+
+def _expects_python(prompt: str, answer: str) -> bool:
+    if re.search(r"\b(?:explain|explanation|justify|reason|why)\b", prompt, re.I):
+        return False
+    if re.search(r"\bsql\b|\bjavascript\b|\btypescript\b|\bjava\b|\bc\+\+\b", prompt, re.I):
+        return False
+    return bool(
+        re.search(r"\bpython\b|```python|\bdef\s+[A-Za-z_]", prompt, re.I)
+        or re.match(r"\s*(?:from\s+\S+\s+import|import\s+\S+|async\s+def|def|class)\b", answer)
+    )
+
+
+def _small_number(raw: str) -> int:
+    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
+    return int(raw) if raw.isdigit() else words[raw.lower()]
 
 
 def _should_try_next_model(exc: FireworksError) -> bool:

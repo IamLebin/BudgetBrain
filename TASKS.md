@@ -34,6 +34,9 @@ Current after the latest Discord/guide clarification.
 - [x] Solve sequential percentages, ratio shares, and weighted average speed locally
 - [x] Solve unique ordering, modus tollens, and simple universal deduction locally
 - [x] Repair mutable defaults and `sequence[len(sequence)]` locally with safety gates
+- [x] Classify clearly factual neutral sentiment locally and handle contracted negation
+- [x] Restructure exact short sentence sets into requested bullet summaries locally
+- [x] Cover geographic prefixes and common organization suffixes in local NER
 
 ## 3. Fireworks Client
 - [x] Per-category model preferences
@@ -47,6 +50,7 @@ Current after the latest Discord/guide clarification.
 - [x] Tune model choices and reasoning effort using official, held-out, and stress live runs
 - [x] Enforce 25-second request timeout and retry only permitted runtime models
 - [x] Normalize final math, sentiment, logic, and code output formats
+- [x] Validate generated Python, summary constraints, and requested NER JSON before acceptance
 
 ## 4. Evaluation
 - [x] Unit tests pass
@@ -56,16 +60,18 @@ Current after the latest Discord/guide clarification.
 - [x] Track live token usage per category
 - [x] Import all 8 official practice tasks from the updated guide
 - [x] Add 16 held-out variants and 8 reasoning stress tasks
-- [x] Final live official run passes `8/8` with `251` Fireworks tokens
-- [x] Final live held-out run passes `16/16` with `483` Fireworks tokens
+- [x] V3 live official run passes `8/8` with `256` Fireworks tokens
+- [x] V3 live held-out run passes `16/16` with `362` Fireworks tokens
+- [x] V3 Docker held-out run passes `16/16` with `366` Fireworks tokens
 - [x] Final Docker reasoning stress run passes `8/8` with `262` Fireworks tokens
-- [x] Add 12 zero-token local champion variants and 51 generated safety/property checks
+- [x] Add 17 zero-token local champion variants and 51 generated safety/property checks
 
 ## 5. Docker
 - [x] Dockerfile builds as `linux/amd64`
 - [x] Image is far under `10GB`
 - [x] Container reads `/input/tasks.json` and writes `/output/results.json`
 - [x] Final local candidate `budgetbrain-track1:champion-v2` is `linux/amd64`, `45,525,751` bytes
+- [x] V3 local candidate `budgetbrain-track1:champion-v3` is `linux/amd64`, `45,527,782` bytes
 - [x] Push immutable image to public Docker Hub registry
 - [x] Confirm anonymous `linux/amd64` manifest access and pull work
 
@@ -90,3 +96,4 @@ Current after the latest Discord/guide clarification.
   `lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2`
 - [x] Verify the optimized tag with an anonymous `linux/amd64` pull
 - [ ] Update the submission form to the optimized immutable tag
+- [ ] Push and anonymously verify a new immutable v3 tag

@@ -11,17 +11,17 @@
   code debugging.
 - Fireworks fallback implemented with `FIREWORKS_API_KEY`, `FIREWORKS_BASE_URL`, and
   `ALLOWED_MODELS`.
-- Unit validation passes: `39/39`.
+- Unit validation passes: `44/44`.
 - Offline baseline, official, held-out, local-champion, and reasoning fixtures pass: `8/8`,
-  `8/8`, `16/16`, `12/12`, and `8/8`.
+  `8/8`, `16/16`, `17/17`, and `8/8`.
 - Final official-practice live run passes `8/8`, with Fireworks on `3/8` tasks and local
   solvers on `5/8`.
-- Latest final official live token total: `251` across three calls.
-- Final held-out live suite passes `16/16` at `483` tokens.
+- Latest v3 official live token total: `256` across three calls.
+- V3 held-out live suite passes `16/16` at `362` tokens; the Docker run uses `366` tokens.
 - Final reasoning-stress Docker run passes `8/8` at `262` tokens, with six local answers.
 - Docker build passes for `linux/amd64`.
-- Current final image: `budgetbrain-track1:champion-v2`, `linux/amd64`, `45,525,751` bytes
-  by Docker's image content-size field.
+- Current v3 local candidate: `budgetbrain-track1:champion-v3`, `linux/amd64`, `45,527,782`
+  bytes by Docker's image content-size field.
 - Public submission image:
   `lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2`.
 - Public image digest:
@@ -40,6 +40,7 @@
   official 10-minute runtime limit.
 
 ## Still Required Before Real Submission
+- Push v3 under a new immutable public tag and verify anonymous pull.
 - Enter the immutable image reference in the Track 1 submission form; do not use a mutable
   local-only tag.
 - Watch for failure statuses in the updated guide:
