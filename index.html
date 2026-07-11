@@ -532,9 +532,10 @@ async function run() {
     // Token efficiency
     const tokEl = document.getElementById('tokenBadge');
     if (data.is_local) {
-      tokEl.innerHTML = `<span style="color:#22c55e;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;">▓▓▓ 0 FIREWORKS TOKENS</span>`;
+      tokEl.innerHTML = `<span style="color:#22c55e;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;">0 FIREWORKS TOKENS</span>`;
     } else {
-      tokEl.innerHTML = `<span style="color:#ef4444;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;">░░░ FIREWORKS TOKENS USED</span>`;
+      const tkCount = (data.tokens_used != null) ? data.tokens_used + ' TOKENS USED' : 'FIREWORKS TOKENS USED';
+      tokEl.innerHTML = `<span style="color:#ef4444;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;">${tkCount}</span>`;
     }
 
     // Confidence

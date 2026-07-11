@@ -28,6 +28,15 @@ def solve_summarization(prompt: str) -> LocalAnswer | None:
         re.I,
     )
     sentences = _sentences(body)
+    word_limit = re.search(
+        r"\b(?:no\s+more\s+than|at\s+most|maximum\s+of)\s+(\d+)\s+words?\b",
+        prompt,
+        re.I,
+    )
+    if word_limit is not None and len(sentences) == 1:
+        words = re.findall(r"\b[\w'-]+\b", sentences[0])
+        if 4 <= len(words) <= int(word_limit.group(1)):
+            return LocalAnswer(sentences[0], 0.99, "within_word_limit_passthrough")
     if bullet_request is not None:
         requested = _count_value(bullet_request.group("count"))
         if requested != len(sentences) or not (2 <= requested <= 5):
@@ -43,6 +52,15 @@ def solve_summarization(prompt: str) -> LocalAnswer | None:
         word_count = len(re.findall(r"\b[\w'-]+\b", sentences[0]))
         if 5 <= word_count <= 30:
             return LocalAnswer(sentences[0], 0.92, "already_one_sentence")
+    if one_sentence is not None and len(sentences) == 2:
+        counts = [len(re.findall(r"\b[\w'-]+\b", sentence)) for sentence in sentences]
+        if all(4 <= count <= 35 for count in counts) and sum(counts) <= 55:
+            first = sentences[0].rstrip(".!?")
+            second = sentences[1].strip()
+            leading_word = re.match(r"[A-Za-z]+", second)
+            if leading_word is not None and leading_word.group(0)[1:].islower():
+                second = second[0].lower() + second[1:]
+            return LocalAnswer(f"{first}; {second}", 0.96, "two_sentence_join")
     return None
 
 
