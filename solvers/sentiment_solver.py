@@ -13,12 +13,15 @@ POSITIVE = {
     "comfortable",
     "convenient",
     "delightful",
+    "delicious",
     "durable",
     "easy",
     "efficient",
     "excellent",
     "fantastic",
     "fast",
+    "flawless",
+    "friendly",
     "good",
     "great",
     "happy",
@@ -36,6 +39,8 @@ POSITIVE = {
     "recommend",
     "reliable",
     "responsive",
+    "resolved",
+    "replacement",
     "satisfied",
     "smooth",
     "stable",
@@ -54,6 +59,8 @@ NEGATIVE = {
     "crashed",
     "confusing",
     "crashes",
+    "damaged",
+    "dented",
     "difficult",
     "disappointing",
     "disappointed",
@@ -72,6 +79,7 @@ NEGATIVE = {
     "laggy",
     "limited",
     "late",
+    "missing",
     "mediocre",
     "poor",
     "problem",
@@ -81,6 +89,10 @@ NEGATIVE = {
     "scratched",
     "scratches",
     "slow",
+    "rude",
+    "noisy",
+    "overcrowded",
+    "impossible",
     "stuck",
     "terrible",
     "underwhelming",
@@ -114,7 +126,7 @@ NEGATION_BOUNDARIES = {".", "!", "?", ";", ",", "but", "however", "although", "y
 def solve_sentiment(prompt: str) -> LocalAnswer | None:
     instruction = prompt.split(":", maxsplit=1)[0]
     if re.search(r"\b(justify|explain|reason|why)\b", instruction, re.I):
-        return None
+        return _solve_mixed_contrast_reason(prompt)
 
     text = _strip_instruction(prompt)
     if any(
@@ -171,6 +183,13 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
         else:
             label = "mixed"
         return LocalAnswer(label, min(0.95, 0.84 + hits * 0.03), "mixed_lexicon")
+    if hits >= 2 and _is_short_unambiguous_statement(text):
+        label = "positive" if positive_hits else "negative"
+        return LocalAnswer(
+            _requested_label_style(label, prompt),
+            0.97,
+            "strong_unanimous_lexicon",
+        )
     if hits == 1 and _is_short_unambiguous_statement(text):
         label = "positive" if positive_hits else "negative"
         label = _requested_label_style(label, prompt)
@@ -181,6 +200,47 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
     if negative_hits:
         return LocalAnswer("negative", min(0.96, 0.72 + hits * 0.1), "lexicon")
     return None
+
+
+def _solve_mixed_contrast_reason(prompt: str) -> LocalAnswer | None:
+    instruction = prompt.split(":", maxsplit=1)[0]
+    if not re.search(r"\b(?:one|1)[- ]sentence\b", instruction, re.I):
+        return None
+    text = _strip_instruction(prompt).strip()
+    parts = re.split(r"\s*\b(?:but|however|although|yet)\b\s*", text, maxsplit=1, flags=re.I)
+    if len(parts) != 2:
+        return None
+    left, right = (_sentiment_clause(part) for part in parts)
+    if not left or not right:
+        return None
+    left_positive, left_negative = _simple_polarity(left)
+    right_positive, right_negative = _simple_polarity(right)
+    if not (
+        (left_positive and right_negative)
+        or (left_negative and right_positive)
+    ):
+        return None
+    label = "Mixed" if re.search(r"\bmixed\b", instruction, re.I) else "Neutral"
+    return LocalAnswer(
+        f"{label} — the review contrasts {left} with {right}.",
+        0.99,
+        "mixed_contrast_reason",
+    )
+
+
+def _sentiment_clause(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[.!?]+", ";", text)).strip(" \t\r\n;,'\"")
+
+
+def _simple_polarity(text: str) -> tuple[bool, bool]:
+    words = set(re.findall(r"[a-z']+", text.lower()))
+    positive = bool(words & POSITIVE) or bool(
+        re.search(r"\b(?:works?|worked|working|runs?|ran|functions?|operates?)\s+perfectly\b", text, re.I)
+    )
+    negative = bool(words & NEGATIVE) or bool(
+        re.search(r"\b(?:broke|breaks|could\s+barely|can\s+barely)\b", text, re.I)
+    )
+    return positive, negative
 
 
 def _is_short_unambiguous_statement(text: str) -> bool:

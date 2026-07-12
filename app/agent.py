@@ -44,11 +44,22 @@ LOCAL_MIN_CONFIDENCE = {
 # emergency fallback when Fireworks is unavailable, but never prefer them during scored runs.
 REMOTE_FIRST_CATEGORIES = {"sentiment", "summarization", "ner"}
 
+# These semantic methods are narrow enough that their completeness and format can be verified.
+REMOTE_FIRST_LOCAL_METHODS = {
+    "sentiment": {
+        "factual_neutral",
+        "mixed_contrast_reason",
+        "strong_unanimous_lexicon",
+    },
+}
+
 # Semantic categories remain remote-first except for narrow methods whose outputs are
 # structurally verifiable. The threshold is per method, not per broad category, so an unfamiliar
 # wording falls through to Fireworks instead of receiving a plausible local guess.
 VERIFIED_LOCAL_METHODS = {
     "sentiment": {
+        "strong_unanimous_lexicon": 0.97,
+        "mixed_contrast_reason": 0.99,
         "lexicon": 0.91,
         "factual_neutral": 0.92,
         "mixed_lexicon": 0.89,
@@ -85,6 +96,8 @@ VERIFIED_LOCAL_METHODS = {
         "count_vowels_generation": 0.99,
     },
     "factual_qa": {
+        "ram_rom_comparison": 0.99,
+        "standard_concept_comparison": 0.99,
         "stdlib_http_status": 0.99,
         "stdlib_python_exception": 0.99,
     },
@@ -102,9 +115,15 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
     classification = classify_prompt(prompt)
     solver = LOCAL_SOLVERS.get(classification.category)
 
-    if solver is not None and classification.category not in REMOTE_FIRST_CATEGORIES:
+    if solver is not None:
         local = solver(prompt)
-        if local is not None and _can_use_local(
+        remote_first_allowed = local is not None and local.method in REMOTE_FIRST_LOCAL_METHODS.get(
+            classification.category,
+            set(),
+        )
+        if local is not None and (
+            classification.category not in REMOTE_FIRST_CATEGORIES or remote_first_allowed
+        ) and _can_use_local(
             prompt,
             classification.category,
             local.method,
@@ -152,10 +171,13 @@ def _can_use_local(prompt: str, category: str, method: str, confidence: float) -
         re.I,
     )
     exact_factual_explanation = category == "factual_qa" and method in {
+        "ram_rom_comparison",
+        "standard_concept_comparison",
         "stdlib_http_status",
         "stdlib_python_exception",
     }
-    if explanation_requested and not exact_factual_explanation:
+    exact_sentiment_explanation = category == "sentiment" and method == "mixed_contrast_reason"
+    if explanation_requested and not (exact_factual_explanation or exact_sentiment_explanation):
         return False
     if category in LOCAL_MIN_CONFIDENCE:
         return confidence >= LOCAL_MIN_CONFIDENCE[category]

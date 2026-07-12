@@ -79,6 +79,13 @@ class LocalSolverTests(unittest.TestCase):
         )
         self.assertIsNotNone(variant)
         self.assertEqual(variant.answer, "165")
+        audit_wording = solve_math(
+            "A price is 100 dollars. It rises by 20%, then is discounted by 15%. "
+            "What is the final price?"
+        )
+        self.assertIsNotNone(audit_wording)
+        self.assertEqual(audit_wording.answer, "102")
+        self.assertEqual(audit_wording.method, "sequential_percent_changes")
         self.assertIsNone(solve_math("What is 20% of 100, then add 10?"))
         self.assertIsNone(
             solve_math(
