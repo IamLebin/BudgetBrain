@@ -82,7 +82,17 @@ def _repair_extremum_function(prompt: str, code: str) -> str | None:
 
 
 def _repair_mutable_default(prompt: str, code: str) -> str | None:
-    if not re.search(r"\bmutable[- ]default\b|\bmutable\b.{0,30}\bdefault\b", prompt, re.I):
+    explicit_mutable_default = re.search(
+        r"\bmutable[- ]default\b|\bmutable\b.{0,30}\bdefault\b",
+        prompt,
+        re.I,
+    )
+    persistent_state = re.search(
+        r"\b(?:persist|retain|shared|remember)\b.{0,60}\b(?:across|between)\b.{0,20}\b(?:calls?|invocations?)\b",
+        prompt,
+        re.I,
+    )
+    if not explicit_mutable_default and not persistent_state:
         return None
     try:
         tree = ast.parse(code)
