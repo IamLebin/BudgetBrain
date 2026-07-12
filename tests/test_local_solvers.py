@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from app.agent import solve_prompt
+from app.agent import SolveResult, solve_prompt
 from app.main import run_batch
 from eval.run_local_eval import FakeFireworksClient
 from fireworks.client import (
@@ -819,6 +820,30 @@ class LocalSolverTests(unittest.TestCase):
             ["accounts/fireworks/models/minimax-m3", "accounts/fireworks/models/gemma-4-26b-a4b-it"],
         )
 
+    def test_fireworks_retries_without_reasoning_effort_and_disables_it(self) -> None:
+        class ProxyCompatibilityClient(FireworksClient):
+            def __init__(self) -> None:
+                super().__init__(
+                    api_key="test",
+                    base_url="https://judge.example/proxy/v1",
+                    allowed_models=["kimi-k2p7-code"],
+                )
+                self.payloads: list[dict[str, object]] = []
+
+            def _post_json(self, path, payload):  # type: ignore[no-untyped-def]
+                self.payloads.append(dict(payload))
+                if "reasoning_effort" in payload:
+                    raise FireworksError("HTTP 400: unsupported field", status_code=400)
+                return {"choices": [{"message": {"content": "Canberra"}}]}
+
+        client = ProxyCompatibilityClient()
+        self.assertEqual(client.solve("What is Australia's capital?", "factual_qa"), "Canberra")
+        self.assertEqual(client.solve("Name Australia's capital.", "factual_qa"), "Canberra")
+        self.assertEqual(len(client.payloads), 3)
+        self.assertIn("reasoning_effort", client.payloads[0])
+        self.assertNotIn("reasoning_effort", client.payloads[1])
+        self.assertNotIn("reasoning_effort", client.payloads[2])
+
     def test_fireworks_retries_invalid_generated_python(self) -> None:
         class ValidationRetryClient(FireworksClient):
             def __init__(self) -> None:
@@ -942,6 +967,30 @@ class LocalSolverTests(unittest.TestCase):
         self.assertEqual(results, written)
         self.assertEqual([row["task_id"] for row in results], ["one", "two"])
         self.assertEqual([row["answer"] for row in results], ["42", "positive"])
+
+    def test_batch_reuses_one_fireworks_client_for_all_tasks(self) -> None:
+        tasks = [
+            {"task_id": "one", "prompt": "First question?"},
+            {"task_id": "two", "prompt": "Second question?"},
+        ]
+        shared_client = FakeFireworksClient()
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = Path(tmp) / "tasks.json"
+            output_path = Path(tmp) / "results.json"
+            input_path.write_text(json.dumps(tasks), encoding="utf-8")
+            with patch("app.main.FireworksClient.from_env", return_value=shared_client):
+                with patch(
+                    "app.main.solve_prompt",
+                    side_effect=[
+                        SolveResult("first", "factual_qa", "fireworks"),
+                        SolveResult("second", "factual_qa", "fireworks"),
+                    ],
+                ) as mocked_solve:
+                    run_batch(input_path, output_path)
+
+        self.assertEqual(mocked_solve.call_count, 2)
+        for call in mocked_solve.call_args_list:
+            self.assertIs(call.kwargs["client"], shared_client)
 
 
 if __name__ == "__main__":

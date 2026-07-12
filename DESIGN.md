@@ -107,7 +107,7 @@ become your evidence log, not just a plan.
    local accuracy bar.
 
 ## Current validation snapshot
-- Unit tests: `54/54` passing.
+- Unit tests: `73/73` passing.
 - Offline fixtures: baseline `8/8`, official practice `8/8`, held-out `16/16`, local champion
   `17/17` with zero model calls, and reasoning stress `8/8` with two model calls.
 - V3 live official-practice run: `8/8`, three Fireworks calls, `256` tokens.
@@ -125,11 +125,15 @@ become your evidence log, not just a plan.
   requested NER JSON before accepting them; invalid outputs fall back to the next allowed model.
 - Live Fireworks validation works after normalizing shorthand model names to full Fireworks
   model IDs such as `accounts/fireworks/models/minimax-m3`.
-- Docker image `budgetbrain-track1:champion-v5-accuracy` builds and runs as a single
-  `linux/amd64` manifest; Docker content size is `45,530,242` bytes, comfortably under the
+- Strict stress validation passes `10/10`, and the self-authored 19-task audit passes `19/19`
+  in offline contract mode. Real Fireworks audit responses were reviewed for semantic correctness.
+- A batch-scoped Fireworks client retries the same model without `reasoning_effort` after a
+  proxy HTTP 400, then uses the compatible request shape for remaining tasks.
+- Docker image `budgetbrain-track1:v7-combined-local` builds and runs as a single
+  `linux/amd64` manifest; Docker content size is `45,539,072` bytes, comfortably under the
   `10GB` compressed-size limit.
-- Public v5 manifest inspection and an empty-config anonymous pull pass at digest
-  `sha256:ae93738ccde9c56c0f20ff2a9e13ea29e2917907727d6406dcd00b45c937bc9c`.
+- Public v7 manifest inspection and an empty-config anonymous pull pass at digest
+  `sha256:b055c0f05104736c936620d7687639a1a4e4d50abb6344e3f3070efe265198db`.
 - Adversarial routing tests prevent broad phrases from misclassifying factual, math, grammar,
   and non-sentiment classification prompts. Sentiment negation stops at sentence/contrast
   boundaries, and ambiguous capitalized NER spans fall back to Fireworks instead of guessing.

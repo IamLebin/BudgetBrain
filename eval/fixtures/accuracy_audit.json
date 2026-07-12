@@ -1,0 +1,122 @@
+[
+  {
+    "task_id": "audit-factual-auth",
+    "category": "factual_qa",
+    "prompt": "In one concise sentence, explain the difference between authentication and authorization.",
+    "contains": ["authentication", "authorization"],
+    "contains_any_groups": [["identity", "who"], ["permission", "permitted", "access"]],
+    "fake_answer": "Authentication verifies identity; authorization grants permission."
+  },
+  {
+    "task_id": "audit-factual-acid",
+    "category": "factual_qa",
+    "prompt": "What do the ACID properties of a database transaction stand for?",
+    "contains": ["atomicity", "consistency", "isolation", "durability"]
+  },
+  {
+    "task_id": "audit-math-percent",
+    "category": "math",
+    "prompt": "A price is 100 dollars. It rises by 20%, then is discounted by 15%. What is the final price?",
+    "contains": ["102"]
+  },
+  {
+    "task_id": "audit-math-equation",
+    "category": "math",
+    "prompt": "Solve for x: 4x + 7 = 31.",
+    "expected": "6"
+  },
+  {
+    "task_id": "audit-math-speed",
+    "category": "math",
+    "prompt": "A car travels 60 miles at 30 mph and another 60 miles at 60 mph. What is its average speed for the full trip?",
+    "expected": "40 mph"
+  },
+  {
+    "task_id": "audit-sentiment-mixed",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment as positive, negative, neutral, or mixed: The update fixed the crash, but startup is now painfully slow.",
+    "expected": "mixed"
+  },
+  {
+    "task_id": "audit-sentiment-negative",
+    "category": "sentiment",
+    "prompt": "Determine whether this review is favorable or unfavorable: Despite fast shipping, the item arrived damaged and unusable.",
+    "expected": "unfavorable"
+  },
+  {
+    "task_id": "audit-summary-sentence",
+    "category": "summarization",
+    "prompt": "Summarize in exactly one sentence: A hospital introduced online appointment booking, sent automatic reminders, and added evening clinics. Administrators expect fewer missed visits and shorter waiting times.",
+    "contains": ["hospital", "online", "reminders", "evening", "missed"],
+    "contains_any_groups": [["waiting", "wait times"]],
+    "fake_answer": "The hospital added online booking, reminders, and evening clinics to reduce missed visits and waiting times."
+  },
+  {
+    "task_id": "audit-summary-bullets",
+    "category": "summarization",
+    "prompt": "Summarize this update in two bullet points: The security patch fixes a login bypass vulnerability. It also improves audit logging and reduces memory use during backups.",
+    "contains": ["login", "audit", "memory", "backup"]
+  },
+  {
+    "task_id": "audit-ner-news",
+    "category": "ner",
+    "prompt": "Extract all named entities and their types from: Dr. Priya Shah spoke at the World Health Organization in Geneva on March 14, 2026.",
+    "contains": ["Priya Shah", "PERSON", "World Health Organization", "ORG", "Geneva", "LOCATION", "March 14, 2026", "DATE"]
+  },
+  {
+    "task_id": "audit-ner-technology",
+    "category": "ner",
+    "prompt": "Identify the people, organizations, locations, and dates in: Miguel Torres joined NVIDIA in Singapore last Tuesday.",
+    "contains": ["Miguel Torres", "PERSON", "NVIDIA", "ORG", "Singapore", "LOCATION", "last Tuesday", "DATE"]
+  },
+  {
+    "task_id": "audit-debug-loop",
+    "category": "code_debugging",
+    "prompt": "Fix this Python function so it returns the sum of all numbers, including the final item. Return code only.\n```python\ndef total(values):\n    total = 0\n    for i in range(len(values) - 1):\n        total += values[i]\n    return total\n```",
+    "contains": ["def total", "range(len(values))", "return total"]
+  },
+  {
+    "task_id": "audit-debug-default",
+    "category": "code_debugging",
+    "prompt": "Find and fix the Python bug that makes values persist across calls.\n```python\ndef add_name(name, names=[]):\n    names.append(name)\n    return names\n```",
+    "contains": ["names=None", "if names is None", "names = []"]
+  },
+  {
+    "task_id": "audit-logic-implication",
+    "category": "logic",
+    "prompt": "If a report is approved, it is archived. This report is not archived. Can it be approved? Answer Yes or No.",
+    "expected": "No"
+  },
+  {
+    "task_id": "audit-logic-assignment",
+    "category": "logic",
+    "prompt": "Three people, Ana, Bo, and Cy, each choose a different color: red, blue, or green. Ana does not choose red. Bo chooses blue. Who chooses red?",
+    "expected": "Cy"
+  },
+  {
+    "task_id": "audit-logic-order",
+    "category": "logic",
+    "prompt": "Lina, Omar, and Ravi sit in a row. Lina sits left of Omar, and Ravi sits right of Omar. What is the order from left to right?",
+    "expected": "Lina, Omar, Ravi"
+  },
+  {
+    "task_id": "audit-code-generator",
+    "category": "code_generation",
+    "prompt": "Write a Python function unique_words(text) that returns a set of lowercase words from text, ignoring punctuation.",
+    "contains": ["def unique_words", "lower", "set"]
+  },
+  {
+    "task_id": "audit-code-sql",
+    "category": "code_generation",
+    "prompt": "Write an SQL query that returns the names of customers who have placed no orders. Tables are customers(id, name) and orders(customer_id).",
+    "contains": ["SELECT", "customers", "orders"],
+    "contains_any_groups": [["NOT EXISTS", "NOT IN", "LEFT JOIN"]],
+    "fake_answer": "SELECT name FROM customers WHERE NOT EXISTS (SELECT 1 FROM orders);"
+  },
+  {
+    "task_id": "audit-code-merge",
+    "category": "code_generation",
+    "prompt": "Write a Python function merge_sorted(a, b) that returns one sorted list containing the values from two already sorted lists.",
+    "contains": ["def merge_sorted", "while", "return"]
+  }
+]
