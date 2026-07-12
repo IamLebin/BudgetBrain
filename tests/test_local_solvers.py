@@ -20,6 +20,7 @@ from fireworks.client import (
 )
 from router.classify import classify_prompt
 from solvers.code_debug_solver import solve_code_debug
+from solvers.factual_solver import solve_factual
 from solvers.math_solver import solve_math
 from solvers.ner_solver import solve_ner
 from solvers.sentiment_solver import solve_sentiment
@@ -53,6 +54,40 @@ class LocalSolverTests(unittest.TestCase):
         )
         self.assertIsNotNone(dated)
         self.assertEqual(dated.answer, "100")
+
+    def test_standard_concept_comparisons_use_local_only_when_complete(self) -> None:
+        cases = {
+            (
+                "Compare CPUs and GPUs. Explain how their core architecture and parallelism differ, "
+                "and identify the workloads each is best suited for."
+            ): "sequential",
+            (
+                "What is the difference between supervised and unsupervised machine learning? "
+                "Explain the training data, goal, and one typical task for each."
+            ): "labeled",
+            (
+                "Compare RAM and ROM by volatility, speed, and what each is used for in a computer."
+            ): "firmware",
+            "What is the difference between HTTP and HTTPS? Explain TLS encryption and web security.": "TLS",
+            (
+                "What is the difference between machine learning and deep learning? Explain feature "
+                "engineering and neural networks."
+            ): "manual feature",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                solved = solve_factual(prompt)
+                self.assertIsNotNone(solved)
+                self.assertEqual(solved.method, "standard_concept_comparison")
+                self.assertIn(expected.lower(), solved.answer.lower())
+
+        for prompt in (
+            "Compare RAM and ROM in terms of manufacturing cost only.",
+            "Compare CPUs and GPUs for power consumption in laptops.",
+            "Compare HTTP and HTTPS by adoption rates in 2026.",
+        ):
+            with self.subTest(prompt=prompt):
+                self.assertIsNone(solve_factual(prompt))
 
     def test_math_average_and_linear_equation(self) -> None:
         self.assertEqual(solve_math("Find the average of 4, 6, and 8.").answer, "6")

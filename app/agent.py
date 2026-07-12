@@ -85,6 +85,7 @@ VERIFIED_LOCAL_METHODS = {
         "count_vowels_generation": 0.99,
     },
     "factual_qa": {
+        "standard_concept_comparison": 0.99,
         "stdlib_http_status": 0.99,
         "stdlib_python_exception": 0.99,
     },
@@ -152,6 +153,7 @@ def _can_use_local(prompt: str, category: str, method: str, confidence: float) -
         re.I,
     )
     exact_factual_explanation = category == "factual_qa" and method in {
+        "standard_concept_comparison",
         "stdlib_http_status",
         "stdlib_python_exception",
     }
