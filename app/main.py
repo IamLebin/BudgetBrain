@@ -7,6 +7,7 @@ import sys
 from typing import Any
 
 from app.agent import solve_prompt
+from fireworks.client import FireworksClient, FireworksError
 
 
 DEFAULT_INPUT = Path("/input/tasks.json")
@@ -27,12 +28,17 @@ def load_tasks(path: Path) -> list[dict[str, Any]]:
 def run_batch(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT) -> list[dict[str, str]]:
     tasks = load_tasks(input_path)
     results: list[dict[str, str]] = []
+    client: FireworksClient | None = None
+    try:
+        client = FireworksClient.from_env()
+    except FireworksError as exc:
+        print(f"warning: shared Fireworks client unavailable: {exc}", file=sys.stderr)
 
     for task in tasks:
         task_id = str(task["task_id"])
         prompt = str(task["prompt"])
         try:
-            solved = solve_prompt(prompt)
+            solved = solve_prompt(prompt, client=client)
             answer = solved.answer
             print(
                 f"{task_id}: {solved.category} via {solved.source}",

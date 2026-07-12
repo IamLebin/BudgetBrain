@@ -87,20 +87,18 @@ contract above and avoid hardcoded/cached answers.
 - Docker image builds, runs, and is pullable clean on a fresh machine
 - No category silently fails or times out
 
-## Current competitive target (July 11, 2026, 20:18 team screenshot)
+## Current competitive target (July 12, 2026)
 - Lowest visible nonzero result: `1,763` tokens at `84.2%` (`16/19`).
 - Best visible nonzero 100% result: `2,520` tokens.
-- Our v5 official-practice live run: `8/8`, `551` Fireworks tokens, with two tasks
-  solved locally and six model calls.
-- Our v5 held-out live run: `16/16` at `1,023` Fireworks tokens, with four tasks
-  solved locally and twelve model calls.
-- The v5 policy prioritizes semantic accuracy while retaining deterministic zero-token math
-  and logic paths only when confidence is high.
-- Published image: `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v5`, built
+- V7 preserves the latest verified local solvers and strict output checks, while restoring
+  batch-wide Fireworks proxy compatibility when `reasoning_effort` is rejected.
+- Validation: `73/73` unit tests, official practice `8/8`, strict stress `10/10`, and a
+  self-authored 19-task audit `19/19` in offline contract mode.
+- Published image: `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260712-champion-v7`, built
   as a single `linux/amd64` manifest without provenance/SBOM attachments and verified by an
   empty-config anonymous manifest inspection and pull.
 - Published digest:
-  `sha256:ae93738ccde9c56c0f20ff2a9e13ea29e2917907727d6406dcd00b45c937bc9c`.
+  `sha256:b055c0f05104736c936620d7687639a1a4e4d50abb6344e3f3070efe265198db`.
 
 Leaderboard values can move before the deadline; the implementation target is therefore
 `>=18/19` accuracy and comfortably below the best comparable nonzero result, not merely

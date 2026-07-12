@@ -68,11 +68,10 @@ docker run --rm --platform linux/amd64 \
   budgetbrain-track1:local
 ```
 
-The latest release candidate is `budgetbrain-track1:champion-v5-accuracy`, is a single
-`linux/amd64` manifest, and has Docker content size `45,530,242` bytes. V5 validation produced
-`8/8` official answers at 551 tokens and `16/16` held-out answers at 1,023 tokens. It also
-passes `54/54` unit tests plus adversarial routing, factual-truncation, sentiment-label, and
-cross-language debugging checks.
+The latest release candidate is `budgetbrain-track1:v7-combined-local`, is a single
+`linux/amd64` manifest, and has Docker content size `45,539,072` bytes. V7 passes `73/73` unit
+tests, the official practice fixture (`8/8`), the strict stress fixture (`10/10`), and a
+self-authored 19-task accuracy audit (`19/19`) in offline contract mode.
 
 Published immutable public submission image:
 
@@ -81,26 +80,28 @@ lebinbin/budgetbrain-track1:amd-act2-20260710
 lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v2
 docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v3
 docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v5
+docker.io/lebinbin/budgetbrain-track1:amd-act2-20260712-champion-v7
 ```
 
 The v2 tag is anonymously accessible, but its registry entry contains an extra provenance
-manifest and the evaluator reported `PULL_ERROR`; do not resubmit that tag. Use the current
-accuracy-first single-manifest release:
+manifest and the evaluator reported `PULL_ERROR`; do not resubmit that tag. V7 combines the
+latest accuracy rules with a batch-wide retry when a judging proxy rejects optional
+`reasoning_effort`. Use the current single-manifest release:
 
 ```text
-docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v5
+docker.io/lebinbin/budgetbrain-track1:amd-act2-20260712-champion-v7
 ```
 
 The replacement passes anonymous manifest inspection and an anonymous `linux/amd64` pull.
 Published replacement digest:
 
 ```text
-sha256:ae93738ccde9c56c0f20ff2a9e13ea29e2917907727d6406dcd00b45c937bc9c
+sha256:b055c0f05104736c936620d7687639a1a4e4d50abb6344e3f3070efe265198db
 ```
 
 Anonymous verification:
 
 ```bash
 docker pull --platform linux/amd64 \
-  docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v5
+  docker.io/lebinbin/budgetbrain-track1:amd-act2-20260712-champion-v7
 ```

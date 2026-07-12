@@ -11,24 +11,25 @@
   semantic categories use Fireworks during normal scoring.
 - Fireworks fallback implemented with `FIREWORKS_API_KEY`, `FIREWORKS_BASE_URL`, and
   `ALLOWED_MODELS`.
-- Unit validation passes: `54/54`.
+- Unit validation passes: `73/73`.
 - Offline baseline, official, held-out, local-champion, and reasoning fixtures pass: `8/8`,
   `8/8`, `16/16`, `17/17`, and `8/8`.
-- Final v5 official-practice live run passes `8/8`, with Fireworks on `6/8` tasks and local
-  solvers on `2/8`.
-- Latest v5 official live token total: `551` across six calls.
-- V5 held-out live suite passes `16/16` at `1,023` tokens across twelve calls.
+- Official-practice fixture passes `8/8`; strict stress passes `10/10`; the self-authored
+  19-task accuracy audit passes `19/19` in offline contract mode.
 - Final reasoning-stress Docker run passes `8/8` at `262` tokens, with six local answers.
 - Docker build passes for `linux/amd64`.
-- Current v5 release candidate: `budgetbrain-track1:champion-v5-accuracy`, single
-  `linux/amd64` manifest, `45,530,242` bytes by Docker's image content-size field.
+- Current v7 release candidate: `budgetbrain-track1:v7-combined-local`, single `linux/amd64`
+  manifest, `45,539,072` bytes by Docker's image content-size field.
 - Public submission image:
-  `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v5`.
+  `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260712-champion-v7`.
 - Public image digest:
-  `sha256:ae93738ccde9c56c0f20ff2a9e13ea29e2917907727d6406dcd00b45c937bc9c`.
+  `sha256:b055c0f05104736c936620d7687639a1a4e4d50abb6344e3f3070efe265198db`.
 - The prior v2 tag is public, but its OCI index includes an `unknown/unknown` provenance child;
   the evaluator reported `PULL_ERROR` before any accuracy score was produced.
-- V5 is built with provenance and SBOM disabled. Empty-config anonymous manifest inspection
+- V7 restores a batch-wide compatible retry if the scoring proxy rejects optional
+  `reasoning_effort`; a container-level mock-proxy test confirms the first request retries bare
+  and subsequent requests omit the field.
+- V7 is built with provenance and SBOM disabled. Empty-config anonymous manifest inspection
   and `linux/amd64` pull both pass.
 - Official accuracy gate: `80%`.
 - Real eval has `19` tasks, so target is at least `16/19` correct.
@@ -44,7 +45,7 @@
 
 ## Still Required Before Real Submission
 - Enter this exact full image reference in the Track 1 submission form:
-  `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v5`.
+  `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260712-champion-v7`.
 - Watch for failure statuses in the updated guide:
   `PULL_ERROR`, `RUNTIME_ERROR`, `TIMEOUT`, `INVALID_RESULTS_SCHEMA`, `MODEL_VIOLATION`,
   `IMAGE_TOO_LARGE`, `ACCURACY_GATE_FAILED`.
