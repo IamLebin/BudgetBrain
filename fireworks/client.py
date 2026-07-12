@@ -22,12 +22,12 @@ DEFAULT_MODELS = (
 
 MODEL_PREFERENCE = {
     "factual_qa": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
-    "math": ("minimax-m3", "kimi-k2p7-code", "gemma-4-26b-a4b-it"),
+    "math": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "sentiment": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "summarization": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "ner": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "code_debugging": ("kimi-k2p7-code", "minimax-m3", "gemma-4-31b-it-nvfp4"),
-    "logic": ("minimax-m3", "kimi-k2p7-code", "gemma-4-26b-a4b-it"),
+    "logic": ("kimi-k2p7-code", "minimax-m3", "gemma-4-26b-a4b-it"),
     "code_generation": ("kimi-k2p7-code", "minimax-m3", "gemma-4-31b-it-nvfp4"),
 }
 
@@ -48,12 +48,7 @@ SYSTEM_PROMPTS = {
         "Unless the user asks for detail, use one sentence of at most 35 words with no preamble."
     ),
     "math": "Solve carefully and verify the arithmetic. Follow the requested format and detail level.",
-    "sentiment": (
-        "Classify the full text using only allowed labels. When a reason is requested, explicitly "
-        "mention every positive and negative aspect from the input instead of grouping or "
-        "generalizing them; preserve concrete timing, quantity, delivery, damage, and resolution "
-        "details, and obey the requested sentence count."
-    ),
+    "sentiment": "Use only requested labels. Give a reason only when requested and obey format limits.",
     "summarization": (
         "Preserve key facts and obey every length, count, and format constraint. Cover every "
         "explicitly listed capability, benefit, drawback, risk, cause, response, and named actor "
@@ -78,40 +73,34 @@ SYSTEM_PROMPTS = {
 
 def _system_prompt(category: str, prompt: str) -> str:
     base = SYSTEM_PROMPTS.get(category, SYSTEM_PROMPTS["factual_qa"])
-    if category == "factual_qa" and re.search(r"\b(?:define|what\s+is|explain\s+what)\b", prompt, re.I):
-        base += " For technical definitions, state the core mechanism, not only the purpose or outcome."
-    example_request = re.search(
-        r"\b(?:provide|give|name)\s+(two|three|2|3)\b.{0,30}\bexamples?\b",
-        prompt,
-        re.I,
-    )
-    if category == "factual_qa" and example_request is not None:
-        count = {"two": "2", "three": "3"}.get(
-            example_request.group(1).lower(),
-            example_request.group(1),
-        )
-        base += f" Provide exactly {count} examples labeled Example 1, Example 2, and so on."
     if category == "factual_qa" and _is_comparison_question(prompt):
-        comparison = (
+        return (
             base
             + " For comparisons, explicitly state hierarchy or subset relationships and contrast "
             "mechanism, feature handling, key properties such as volatility and relative speed, "
             "and uses whenever relevant. Do not omit a comparison dimension."
         )
-        if _is_ml_deep_comparison(prompt):
-            comparison += (
-                " Explicitly contrast manual feature engineering in traditional machine learning "
-                "with automatic feature learning in deep neural networks."
-            )
-        return comparison
-    if category == "summarization" and re.search(r"\bbullet\s+points?\b", prompt, re.I):
+    if category == "sentiment" and re.search(
+        r"\b(?:reason|reasoning|justify|explain|why)\b", prompt, re.I
+    ):
         return (
             base
-            + " Use each requested bullet for a different major theme. When present, cover benefits, "
-            "drawbacks or risks, and responses; do not repeat one theme while omitting another."
+            + " When a reason is requested, explicitly mention every positive and negative aspect "
+            "from the input instead of grouping or generalizing them; preserve concrete timing, "
+            "quantity, delivery, damage, and resolution details, and identify sarcasm when present."
         )
+    if category == "summarization":
+        if re.search(r"\bbullet\s+points?\b", prompt, re.I):
+            return (
+                base
+                + " Use each requested bullet for a different major theme. When present, cover benefits, "
+                "drawbacks or risks, and responses; do not repeat one theme while omitting another."
+            )
+        return base
     if category == "ner":
-        return base + " Copy the user's label names exactly; do not abbreviate ORGANIZATION as ORG."
+        return base + ' Return one entity per line as "entity | LABEL" with exact uppercase labels.'
+    if category == "code_debugging" and not _code_only_requested(prompt):
+        return base + " Briefly name the bug before the corrected code."
     return base
 
 
@@ -126,10 +115,14 @@ def _is_comparison_question(prompt: str) -> bool:
     )
 
 
-def _is_ml_deep_comparison(prompt: str) -> bool:
+def _code_only_requested(prompt: str) -> bool:
     return bool(
-        re.search(r"\bmachine\s+learning\b", prompt, re.I)
-        and re.search(r"\b(?:deep\s+learning|deep\s+neural|neural\s+network)\b", prompt, re.I)
+        re.search(
+            r"\b(?:only|just)\s+(?:return|output|provide|show)\b.{0,30}\b(?:code|fix)\b|"
+            r"\b(?:code|fix)\s+only\b",
+            prompt,
+            re.I,
+        )
     )
 
 
@@ -246,14 +239,10 @@ class FireworksClient:
         if (
             category == "factual_qa" and _is_comparison_question(prompt)
         ) or (
-            category == "factual_qa"
-            and re.search(r"\bexplain\b", prompt, re.I)
-            and re.search(r"\b(?:and|then)\s+(?:name|list|provide|give)\b", prompt, re.I)
-        ) or (
             category == "summarization" and re.search(r"\bbullet\s+points?\b", prompt, re.I)
         ) or (
             category == "sentiment"
-            and re.search(r"\b(?:reason|reasoning|justify|explain)\b", prompt, re.I)
+            and re.search(r"\b(?:reason|reasoning|justify|explain|why)\b", prompt, re.I)
         ):
             candidates.sort(key=lambda model: canonical_model_name(model) != "minimax-m3")
         return candidates

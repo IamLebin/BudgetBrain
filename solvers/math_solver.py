@@ -333,6 +333,8 @@ def _solve_sequential_percent_changes(text: str) -> LocalAnswer | None:
         fr"\b(?:starts?|begins?)\s+(?:at|with)\s+\$?(?P<value>{number})\b",
         fr"\b(?:initial|original|starting)\s+(?:price|value|amount|cost)?\s*"
         fr"(?:is|was|of|:)\s*\$?(?P<value>{number})\b",
+        fr"\b(?:price|value|amount|cost)\s+(?:is|was)\s+\$?(?P<value>{number})"
+        r"(?:\s+(?:dollars?|usd))?\b",
     )
     initial_match = next(
         (
@@ -348,7 +350,7 @@ def _solve_sequential_percent_changes(text: str) -> LocalAnswer | None:
     tail = text[initial_match.end() :]
     change_pattern = re.compile(
         fr"\b(?P<verb>increase[sd]?|rise[sd]?|grow(?:s|n)?|"
-        fr"decrease[sd]?|drop(?:s|ped)?|fall(?:s|en)?|reduc(?:e[sd]?|ed))\s+"
+        fr"decrease[sd]?|drop(?:s|ped)?|fall(?:s|en)?|reduc(?:e[sd]?|ed)|discount(?:ed|s)?)\s+"
         fr"(?:by\s+)?(?P<pct>{number})(?:\s*%|\s+percent\b)",
         flags=re.IGNORECASE,
     )

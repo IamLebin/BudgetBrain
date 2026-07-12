@@ -79,6 +79,12 @@ class LocalSolverTests(unittest.TestCase):
         )
         self.assertIsNotNone(variant)
         self.assertEqual(variant.answer, "165")
+        discounted = solve_math(
+            "A price is 100 dollars. It rises by 20%, then is discounted by 15%. "
+            "What is the final price?"
+        )
+        self.assertIsNotNone(discounted)
+        self.assertEqual(discounted.answer, "102")
         self.assertIsNone(solve_math("What is 20% of 100, then add 10?"))
         self.assertIsNone(
             solve_math(
@@ -352,6 +358,14 @@ class LocalSolverTests(unittest.TestCase):
         self.assertIsNotNone(mutable)
         self.assertIn("bucket=None", mutable.answer)
         self.assertIn("if bucket is None", mutable.answer)
+        implicit_mutable = solve_code_debug(
+            "Find and fix the Python bug that makes values persist across calls:\n"
+            "```python\ndef add_name(name, names=[]):\n"
+            "    names.append(name)\n    return names\n```"
+        )
+        self.assertIsNotNone(implicit_mutable)
+        self.assertIn("names=None", implicit_mutable.answer)
+        self.assertIn("if names is None", implicit_mutable.answer)
         nonempty = solve_code_debug(
             "Fix the mutable default bug:\n"
             "```python\ndef collect(value, items=[1]):\n"
@@ -491,8 +505,10 @@ class LocalSolverTests(unittest.TestCase):
             allowed_models=["minimax-m3", "kimi-k2p7-code"],
         )
         self.assertEqual(client.pick_model("factual_qa"), "kimi-k2p7-code")
+        self.assertEqual(client.pick_model("math"), "kimi-k2p7-code")
         self.assertEqual(client.pick_model("summarization"), "kimi-k2p7-code")
         self.assertEqual(client.pick_model("sentiment"), "kimi-k2p7-code")
+        self.assertEqual(client.pick_model("logic"), "kimi-k2p7-code")
         self.assertEqual(
             client.candidate_models_for_prompt(
                 "factual_qa",
