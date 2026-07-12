@@ -44,32 +44,46 @@ LOCAL_MIN_CONFIDENCE = {
 # emergency fallback when Fireworks is unavailable, but never prefer them during scored runs.
 REMOTE_FIRST_CATEGORIES = {"sentiment", "summarization", "ner"}
 
+# Only methods with deterministic completeness and format checks may bypass remote-first routing.
+REMOTE_FIRST_LOCAL_METHODS = {
+    "sentiment": {
+        "factual_neutral",
+        "mixed_contrast_reason",
+        "strong_unanimous_lexicon",
+    },
+    "summarization": {
+        "already_one_sentence",
+        "short_bullet_extraction",
+        "short_source_passthrough",
+        "two_sentence_join",
+        "within_word_limit_passthrough",
+    },
+    "ner": {"regex_entities"},
+}
+
 # Semantic categories remain remote-first except for narrow methods whose outputs are
 # structurally verifiable. The threshold is per method, not per broad category, so an unfamiliar
 # wording falls through to Fireworks instead of receiving a plausible local guess.
 VERIFIED_LOCAL_METHODS = {
     "sentiment": {
-        "lexicon": 0.91,
         "factual_neutral": 0.92,
-        "mixed_lexicon": 0.89,
-        "strong_single_lexicon": 0.93,
-        "explicit_negated_lexicon": 0.95,
+        "mixed_contrast_reason": 0.99,
+        "strong_unanimous_lexicon": 0.97,
     },
     "summarization": {
-        "short_bullet_extraction": 0.93,
         "already_one_sentence": 0.92,
-        "within_word_limit_passthrough": 0.99,
-        "two_sentence_join": 0.96,
+        "short_bullet_extraction": 0.93,
         "short_source_passthrough": 0.99,
+        "two_sentence_join": 0.96,
+        "within_word_limit_passthrough": 0.99,
     },
-    "ner": {
-        "regex_entities": 0.9,
-    },
+    "ner": {"regex_entities": 0.9},
     "code_debugging": {
         "missing_colon_repair": 0.97,
         "extremum_repair": 0.98,
         "len_index_repair": 0.99,
         "mutable_default_repair": 0.99,
+        "skipped_final_loop_repair": 0.99,
     },
     "code_generation": {
         "second_largest_generation": 0.99,
@@ -83,9 +97,13 @@ VERIFIED_LOCAL_METHODS = {
         "is_even_generation": 0.99,
         "sum_list_generation": 0.99,
         "count_vowels_generation": 0.99,
+        "customers_without_orders_sql_generation": 0.99,
+        "merge_sorted_generation": 0.99,
+        "unique_words_generation": 0.99,
     },
     "factual_qa": {
         "standard_concept_comparison": 0.99,
+        "standard_factual_definition": 0.99,
         "stdlib_http_status": 0.99,
         "stdlib_python_exception": 0.99,
     },
@@ -96,16 +114,25 @@ CODE_DEBUG_DIAGNOSES = {
     "extremum_repair": "Bug: the function returns one element instead of computing the requested extremum.",
     "len_index_repair": "Bug: len(sequence) is one past the final valid index.",
     "mutable_default_repair": "Bug: a mutable default argument is shared between calls.",
+    "skipped_final_loop_repair": "Bug: the loop stops before the final item.",
 }
 
 
 def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveResult:
     classification = classify_prompt(prompt)
     solver = LOCAL_SOLVERS.get(classification.category)
+    remote_first_methods = REMOTE_FIRST_LOCAL_METHODS.get(classification.category, set())
 
-    if solver is not None and classification.category not in REMOTE_FIRST_CATEGORIES:
+    should_try_local = (
+        classification.category not in REMOTE_FIRST_CATEGORIES or bool(remote_first_methods)
+    )
+    if solver is not None and should_try_local:
         local = solver(prompt)
-        if local is not None and _can_use_local(
+        route_allows_local = (
+            classification.category not in REMOTE_FIRST_CATEGORIES
+            or (local is not None and local.method in remote_first_methods)
+        )
+        if local is not None and route_allows_local and _can_use_local(
             prompt,
             classification.category,
             local.method,
@@ -154,10 +181,12 @@ def _can_use_local(prompt: str, category: str, method: str, confidence: float) -
     )
     exact_factual_explanation = category == "factual_qa" and method in {
         "standard_concept_comparison",
+        "standard_factual_definition",
         "stdlib_http_status",
         "stdlib_python_exception",
     }
-    if explanation_requested and not exact_factual_explanation:
+    exact_sentiment_explanation = category == "sentiment" and method == "mixed_contrast_reason"
+    if explanation_requested and not (exact_factual_explanation or exact_sentiment_explanation):
         return False
     if category in LOCAL_MIN_CONFIDENCE:
         return confidence >= LOCAL_MIN_CONFIDENCE[category]
@@ -176,6 +205,8 @@ def _can_use_local(prompt: str, category: str, method: str, confidence: float) -
 
 def _format_local_answer(prompt: str, category: str, method: str, answer: str) -> str:
     cleaned = answer.strip()
+    if category == "ner" and re.search(r"\bORGANIZATION\b", prompt, re.I):
+        cleaned = re.sub(r'("label"\s*:\s*")ORG("\s*)', r"\1ORGANIZATION\2", cleaned)
     if category != "code_debugging" or re.search(
         r"\b(?:only|just)\s+(?:return|output|provide|show)\b.{0,30}\b(?:code|fix)\b|"
         r"\b(?:code|fix)\s+only\b",

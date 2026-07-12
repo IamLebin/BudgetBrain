@@ -24,6 +24,10 @@ def solve_code_debug(prompt: str) -> LocalAnswer | None:
     if index is not None:
         return LocalAnswer(index, 0.99, "len_index_repair")
 
+    skipped_final = _repair_skipped_final_loop(prompt, code)
+    if skipped_final is not None:
+        return LocalAnswer(skipped_final, 0.99, "skipped_final_loop_repair")
+
     try:
         ast.parse(code)
     except SyntaxError:
@@ -160,6 +164,26 @@ def _repair_len_index(prompt: str, code: str) -> str | None:
         r"(?P<container>\b[A-Za-z_]\w*)\s*\[\s*len\s*\(\s*(?P=container)\s*\)\s*\]"
     )
     repaired, count = pattern.subn(r"\g<container>[-1]", code)
+    if count != 1:
+        return None
+    try:
+        ast.parse(repaired)
+    except SyntaxError:
+        return None
+    return repaired
+
+
+def _repair_skipped_final_loop(prompt: str, code: str) -> str | None:
+    if not re.search(
+        r"\b(?:including\s+the\s+(?:final|last)\s+(?:item|value)|all\s+(?:items|numbers|values))\b",
+        prompt,
+        re.I,
+    ):
+        return None
+    pattern = re.compile(
+        r"range\(\s*len\(\s*(?P<name>[A-Za-z_]\w*)\s*\)\s*-\s*1\s*\)"
+    )
+    repaired, count = pattern.subn(r"range(len(\g<name>))", code)
     if count != 1:
         return None
     try:

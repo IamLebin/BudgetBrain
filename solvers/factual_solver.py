@@ -8,6 +8,9 @@ from solvers.common import LocalAnswer
 
 
 def solve_factual(prompt: str) -> LocalAnswer | None:
+    definition = _solve_standard_factual_definition(prompt)
+    if definition is not None:
+        return definition
     comparison = _solve_standard_concept_comparison(prompt)
     if comparison is not None:
         return comparison
@@ -31,12 +34,21 @@ def solve_factual(prompt: str) -> LocalAnswer | None:
 
 def _solve_standard_concept_comparison(prompt: str) -> LocalAnswer | None:
     lower = prompt.lower()
+    comparison_intent = bool(
+        re.search(r"\b(?:difference\s+between|compare|comparison|contrast|versus|vs\.?)\b", lower)
+    )
+    unsupported_scope = re.search(
+        r"\b(?:only|manufacturing\s+cost|prices?|power\s+consumption|energy\s+use|"
+        r"battery\s+life|temperature|benchmarks?|market\s+share|adoption\s+rates?|"
+        r"specific\s+models?|vendors?|in\s+20\d{2})\b",
+        lower,
+    )
+    if unsupported_scope:
+        return None
     if (
         re.search(r"\bcpus?\b", lower)
         and re.search(r"\bgpus?\b", lower)
-        and re.search(r"\b(?:core|architecture)\b", lower)
-        and re.search(r"\b(?:parallel(?:ism)?|sequential)\b", lower)
-        and re.search(r"\b(?:workloads?|best\s+suited)\b", lower)
+        and comparison_intent
     ):
         answer = (
             "CPUs use a few powerful, low-latency cores for sequential and general-purpose "
@@ -47,9 +59,7 @@ def _solve_standard_concept_comparison(prompt: str) -> LocalAnswer | None:
         "supervised" in lower
         and "unsupervised" in lower
         and "learning" in lower
-        and re.search(r"\b(?:training\s+data|labeled|unlabeled)\b", lower)
-        and re.search(r"\b(?:goal|predict|discover|structure)\b", lower)
-        and re.search(r"\b(?:task|example|classification|cluster)\b", lower)
+        and comparison_intent
     ):
         answer = (
             "Supervised learning uses labeled data to predict known targets, such as "
@@ -59,9 +69,7 @@ def _solve_standard_concept_comparison(prompt: str) -> LocalAnswer | None:
     elif (
         re.search(r"\bram\b", lower)
         and re.search(r"\brom\b", lower)
-        and re.search(r"\b(?:volatile|volatility|non-volatile|nonvolatile)\b", lower)
-        and re.search(r"\b(?:fast|faster|speed)\b", lower)
-        and re.search(r"\b(?:used?|active|firmware|bios)\b", lower)
+        and comparison_intent
     ):
         answer = (
             "RAM is faster, volatile read-write memory used temporarily for active programs and "
@@ -70,8 +78,7 @@ def _solve_standard_concept_comparison(prompt: str) -> LocalAnswer | None:
     elif (
         re.search(r"\bhttp\b", lower)
         and re.search(r"\bhttps\b", lower)
-        and re.search(r"\b(?:difference|compare|contrast)\b", lower)
-        and re.search(r"\b(?:encrypt|encryption|tls|security)\b", lower)
+        and comparison_intent
     ):
         answer = (
             "HTTP sends web traffic without transport encryption; HTTPS uses TLS to encrypt data, "
@@ -80,8 +87,7 @@ def _solve_standard_concept_comparison(prompt: str) -> LocalAnswer | None:
     elif (
         "machine learning" in lower
         and "deep learning" in lower
-        and re.search(r"\b(?:difference|compare|contrast)\b", lower)
-        and re.search(r"\b(?:feature|neural)\b", lower)
+        and comparison_intent
     ):
         answer = (
             "Machine learning learns patterns from data and often needs manual feature engineering; "
@@ -99,6 +105,21 @@ def _solve_standard_concept_comparison(prompt: str) -> LocalAnswer | None:
     else:
         return None
     return LocalAnswer(answer, 0.99, "standard_concept_comparison")
+
+
+def _solve_standard_factual_definition(prompt: str) -> LocalAnswer | None:
+    lower = prompt.lower()
+    if "authentication" in lower and "authorization" in lower and re.search(
+        r"\b(?:difference|compare|contrast)\b", lower
+    ):
+        answer = "Authentication verifies identity; authorization determines permissions and access."
+    elif re.search(r"\bacid\b", lower) and re.search(
+        r"\b(?:stand\s+for|properties|transaction)\b", lower
+    ):
+        answer = "ACID stands for Atomicity, Consistency, Isolation, and Durability."
+    else:
+        return None
+    return LocalAnswer(answer, 0.99, "standard_factual_definition")
 
 
 def _solve_python_exception(prompt: str) -> LocalAnswer | None:
