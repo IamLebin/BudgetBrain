@@ -52,11 +52,10 @@ only when you must."
   on Gemma unless actively testing or intentionally competing for the Gemma prize.
 
 ## Deadline
-Hackathon runs **July 6–11, 2026**. Confirm exact submission cutoff + timezone from the
-Event Schedule tab on lablab.ai — don't rely on a remembered date under time pressure.
+The official Discord extension moves the submission cutoff to **Sunday, July 12, 2026 at
+3:00 PM PT / 6:00 PM ET**.
 
-## Open items to confirm before coding (from the official Participant Guide — behind login,
-not something I could read directly)
+## Confirmed Participant Guide contract
 - [x] Exact input/output JSON schema for the agent:
   - read `/input/tasks.json`
   - write `/output/results.json`
@@ -87,20 +86,21 @@ contract above and avoid hardcoded/cached answers.
 - Docker image builds, runs, and is pullable clean on a fresh machine
 - No category silently fails or times out
 
-## Current competitive target (July 11, 2026, 20:18 team screenshot)
+## Current competitive target (July 12, 2026)
 - Lowest visible nonzero result: `1,763` tokens at `84.2%` (`16/19`).
 - Best visible nonzero 100% result: `2,520` tokens.
-- Our v5 official-practice live run: `8/8`, `551` Fireworks tokens, with two tasks
-  solved locally and six model calls.
-- Our v5 held-out live run: `16/16` at `1,023` Fireworks tokens, with four tasks
-  solved locally and twelve model calls.
-- The v5 policy prioritizes semantic accuracy while retaining deterministic zero-token math
-  and logic paths only when confidence is high.
-- Published image: `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260711-champion-v5`, built
+- V5's official scorer result was `63.2%` (`12/19`), despite local direct-Fireworks suites
+  passing. An isolated proxy test reproduced a matching failure mechanism: HTTP 400 rejection
+  of the optional `reasoning_effort` field caused every candidate to repeat the same parameter.
+- V6 retries the same model without `reasoning_effort` after such a 400, remembers that proxy
+  capability for the rest of the 19-task batch, and shares one Fireworks client across tasks.
+- The v6 real 19-task container run returned 19 nonempty schema-valid answers in about 19
+  seconds and used `1,256` Fireworks tokens. The unit suite passes `56/56`.
+- Published image: `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260712-champion-v6`, built
   as a single `linux/amd64` manifest without provenance/SBOM attachments and verified by an
   empty-config anonymous manifest inspection and pull.
 - Published digest:
-  `sha256:ae93738ccde9c56c0f20ff2a9e13ea29e2917907727d6406dcd00b45c937bc9c`.
+  `sha256:de03483ec9b4f8b01394edd9a5e17f766d2e9813f5782225e46ba603c246d1b2`.
 
 Leaderboard values can move before the deadline; the implementation target is therefore
 `>=18/19` accuracy and comfortably below the best comparable nonzero result, not merely

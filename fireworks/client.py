@@ -78,6 +78,7 @@ class FireworksClient:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.allowed_models = allowed_models
+        self._reasoning_effort_supported = True
 
     @classmethod
     def from_env(cls) -> "FireworksClient":
@@ -104,10 +105,10 @@ class FireworksClient:
                 "max_tokens": MAX_TOKENS.get(category, 128),
             }
             reasoning_effort = _reasoning_effort(model, category, prompt)
-            if reasoning_effort is not None:
+            if reasoning_effort is not None and self._reasoning_effort_supported:
                 payload["reasoning_effort"] = reasoning_effort
             try:
-                response = self._post_json("/chat/completions", payload)
+                response = self._post_completion(payload, api_model)
                 self._log_usage(category, api_model, response.get("usage"))
                 content = _response_content(response)
                 if _response_was_truncated(response):
@@ -136,6 +137,21 @@ class FireworksClient:
                 errors.append(f"{api_model}: {exc}")
                 print(f"model failed, trying next: {api_model} ({exc})", file=sys.stderr)
         raise FireworksError("all candidate Fireworks models failed: " + "; ".join(errors))
+
+    def _post_completion(self, payload: dict[str, Any], api_model: str) -> dict[str, Any]:
+        try:
+            return self._post_json("/chat/completions", payload)
+        except FireworksError as exc:
+            if exc.status_code != 400 or "reasoning_effort" not in payload:
+                raise
+            self._reasoning_effort_supported = False
+            compatible_payload = dict(payload)
+            compatible_payload.pop("reasoning_effort", None)
+            print(
+                f"proxy rejected reasoning_effort; retrying without it: {api_model}",
+                file=sys.stderr,
+            )
+            return self._post_json("/chat/completions", compatible_payload)
 
     def pick_model(self, category: str) -> str:
         candidates = self.candidate_models(category)

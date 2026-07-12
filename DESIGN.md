@@ -96,6 +96,9 @@ become your evidence log, not just a plan.
   example is tokens spent on every single call.
 - Ask for the answer in the exact output format required, so you don't need a second call
   to reformat.
+- Treat optional request parameters as proxy capabilities. If the injected judging proxy
+  rejects `reasoning_effort` with HTTP 400, retry the same model once without it and omit the
+  parameter for all later tasks in that batch.
 
 ## Testing protocol
 1. Build a local test set per category (start with the FAQ/guide's examples if given, plus
@@ -107,9 +110,9 @@ become your evidence log, not just a plan.
    local accuracy bar.
 
 ## Current validation snapshot
-- Unit tests: `54/54` passing.
+- Unit tests: `56/56` passing.
 - Offline fixtures: baseline `8/8`, official practice `8/8`, held-out `16/16`, local champion
-  `17/17` with zero model calls, and reasoning stress `8/8` with two model calls.
+  `17/17`, reasoning stress `8/8`, adversarial routing `18/18`, and factual concepts `6/6`.
 - V3 live official-practice run: `8/8`, three Fireworks calls, `256` tokens.
 - V3 live held-out run: `16/16`, five Fireworks calls, `362` tokens; the v2 route used
   seven calls and `483` tokens.
@@ -125,11 +128,17 @@ become your evidence log, not just a plan.
   requested NER JSON before accepting them; invalid outputs fall back to the next allowed model.
 - Live Fireworks validation works after normalizing shorthand model names to full Fireworks
   model IDs such as `accounts/fireworks/models/minimax-m3`.
-- Docker image `budgetbrain-track1:champion-v5-accuracy` builds and runs as a single
-  `linux/amd64` manifest; Docker content size is `45,530,242` bytes, comfortably under the
+- The v5 evaluator result was `63.2%` (`12/19`). A controlled mock-proxy A/B run reproduced
+  empty answers when every request included rejected `reasoning_effort`, then produced correct
+  nonempty answers after v6 retried bare and disabled the field batch-wide.
+- V6 reuses one Fireworks client across all tasks so the discovered proxy capability persists.
+  A real 19-task container run returned 19 nonempty schema-valid answers in about 19 seconds at
+  `1,256` Fireworks tokens.
+- Docker image `budgetbrain-track1:champion-v6-proxyfix` builds and runs as a single
+  `linux/amd64` manifest; Docker content size is `45,530,446` bytes, comfortably under the
   `10GB` compressed-size limit.
-- Public v5 manifest inspection and an empty-config anonymous pull pass at digest
-  `sha256:ae93738ccde9c56c0f20ff2a9e13ea29e2917907727d6406dcd00b45c937bc9c`.
+- Public v6 manifest inspection and an empty-config anonymous pull pass at digest
+  `sha256:de03483ec9b4f8b01394edd9a5e17f766d2e9813f5782225e46ba603c246d1b2`.
 - Adversarial routing tests prevent broad phrases from misclassifying factual, math, grammar,
   and non-sentiment classification prompts. Sentiment negation stops at sentence/contrast
   boundaries, and ambiguous capitalized NER spans fall back to Fireworks instead of guessing.
