@@ -38,8 +38,7 @@
     "category": "sentiment",
     "prompt": "Classify the sentiment of this customer review as Positive, Negative, or Neutral and give a one-sentence reason: 'The product arrived two days late and the packaging was damaged, but the item worked perfectly and customer support resolved my complaint within an hour.'",
     "fake_answer": "Mixed: The late, damaged delivery was negative, but the working item and fast support resolution made the outcome positive.",
-    "contains": ["late", "damaged", "work"],
-    "contains_any_groups": [["resolved", "resolution"]],
+    "contains": ["late", "damaged", "work", "resolution"],
     "contains_any": ["mixed", "neutral", "positive"],
     "allowed_labels": ["Mixed", "Neutral", "Positive"],
     "exact_sentences": 1
@@ -60,8 +59,8 @@
     "category": "summarization",
     "prompt": "Summarize the following passage in exactly two sentences:\n\n'Machine learning is increasingly deployed in healthcare for diagnosis, treatment planning, and patient monitoring. These systems analyse medical images, predict patient deterioration, and spot patterns in electronic health records that might be missed by human clinicians. However, concerns remain about model interpretability, data privacy, liability when errors occur, and the potential for algorithmic bias to worsen existing healthcare disparities. Regulatory frameworks are still catching up with the pace of deployment, creating uncertainty for healthcare providers and technology developers alike.'",
     "fake_answer": "Machine learning supports healthcare diagnosis by analysing images, predicting deterioration, and finding patterns in health records. Its deployment raises interpretability, privacy, liability, bias, and regulatory concerns.",
-    "contains": ["healthcare", "diagnosis", "predict", "records", "interpretability", "privacy", "liability", "bias"],
-    "contains_any_groups": [["image", "images"], ["regulatory", "regulation", "regulations"]],
+    "contains": ["healthcare", "diagnosis", "predict", "records", "interpretability", "privacy", "liability", "bias", "regulatory"],
+    "contains_any_groups": [["image", "images"]],
     "exact_sentences": 2
   },
   {

@@ -155,54 +155,13 @@ class AlgorithmSolverTests(unittest.TestCase):
                 self.assertEqual(solved.answer, expected)
                 self.assertGreaterEqual(solved.confidence, 0.98)
 
-    def test_requested_mixed_sentiment_reason_uses_verified_local_contrast(self) -> None:
-        prompts = (
+    def test_requested_sentiment_reason_forces_remote(self) -> None:
+        prompt = (
             "Classify as Positive, Negative, or Neutral and give a one-sentence reason: "
-            "'Delivery was late and the box was damaged, but the item worked perfectly "
-            "and support resolved the issue.'",
-            "Classify the sentiment as Positive, Negative, or Neutral and give a one-sentence "
-            "reason: 'The meal was delicious, but service was slow and the waiter was rude.'",
+            "'Delivery was late, but support resolved the issue.'"
         )
-        for prompt in prompts:
-            with self.subTest(prompt=prompt):
-                solved = solve_prompt(prompt, client=FakeFireworksClient())
-                self.assertEqual(solved.source, "local:mixed_contrast_reason")
-                self.assertEqual(solved.tokens_used, 0)
-                self.assertEqual(sum(solved.answer.count(mark) for mark in ".!?"), 1)
-
-    def test_ram_rom_comparison_is_complete_and_local(self) -> None:
-        prompt = "Explain the difference between RAM and ROM in a computer. What is each type used for?"
-        solved = solve_prompt(prompt, client=FakeFireworksClient())
-        self.assertEqual(solved.source, "local:ram_rom_comparison")
-        self.assertEqual(solved.tokens_used, 0)
-        for concept in ("volatile", "non-volatile", "faster", "slower", "active", "firmware"):
-            self.assertIn(concept, solved.answer.lower())
-
-    def test_standard_technical_comparisons_are_complete_and_local(self) -> None:
-        cases = {
-            "Name the three primary colors in the RGB color model and briefly explain why displays use RGB instead of RYB.": (
-                "red", "green", "blue", "additive", "subtractive", "pigment"
-            ),
-            "What is the difference between machine learning and deep learning? Briefly explain how each works.": (
-                "subset", "multi-layer", "manual feature", "automatically", "raw data"
-            ),
-            "What is the difference between CPU and GPU? Briefly explain what each is best suited for.": (
-                "sequential", "parallel", "latency", "throughput"
-            ),
-            "What is the difference between HTTP and HTTPS? Why is HTTPS important for web security?": (
-                "TLS", "encrypt", "authenticate", "integrity"
-            ),
-            "Explain the difference between supervised and unsupervised machine learning. Give one example of each.": (
-                "labeled", "unlabeled", "classification", "clustering"
-            ),
-        }
-        for prompt, concepts in cases.items():
-            with self.subTest(prompt=prompt):
-                solved = solve_prompt(prompt, client=FakeFireworksClient())
-                self.assertEqual(solved.source, "local:standard_concept_comparison")
-                self.assertEqual(solved.tokens_used, 0)
-                for concept in concepts:
-                    self.assertIn(concept.lower(), solved.answer.lower())
+        client = FakeFireworksClient({prompt: "Neutral: It includes a problem and a positive resolution."})
+        self.assertEqual(solve_prompt(prompt, client=client).source, "fireworks")
 
     def test_short_unambiguous_sentiment_uses_strong_local_path(self) -> None:
         cases = {
@@ -230,18 +189,6 @@ class AlgorithmSolverTests(unittest.TestCase):
             with self.subTest(prompt=ambiguous):
                 routed = solve_prompt(ambiguous, client=FakeFireworksClient({ambiguous: "neutral"}))
                 self.assertEqual(routed.source, "fireworks")
-
-    def test_verified_pure_and_factual_sentiment_routes_locally(self) -> None:
-        cases = {
-            "Classify the sentiment: The service is unreliable and frustrating.": "negative",
-            "Classify as positive, negative, or neutral: The package arrived on Tuesday as scheduled.": "neutral",
-        }
-        for prompt, expected in cases.items():
-            with self.subTest(prompt=prompt):
-                solved = solve_prompt(prompt, client=FakeFireworksClient())
-                self.assertEqual(solved.answer, expected)
-                self.assertEqual(solved.tokens_used, 0)
-                self.assertTrue(solved.source.startswith("local:"))
 
     def test_grouped_average_sql_executes(self) -> None:
         solved = solve_code_generation(
@@ -312,15 +259,15 @@ class AlgorithmSolverTests(unittest.TestCase):
                 self.assertIsNotNone(solved)
                 self.assertIn(solved.method, {"short_source_passthrough", "already_one_sentence"})
 
-    def test_fixture_routing_keeps_unverifiable_semantic_tasks_remote(self) -> None:
+    def test_fixture_routing_keeps_semantic_tasks_remote(self) -> None:
         fixture = json.loads(Path("eval/fixtures/held_out.json").read_text(encoding="utf-8"))
         responses = {str(item["prompt"]): str(item.get("fake_answer", "ok")) for item in fixture}
         client = FakeFireworksClient(responses)
         for item in fixture:
             solve_prompt(str(item["prompt"]), client=client)
-        self.assertEqual(len(client.calls), 5)
+        self.assertEqual(len(client.calls), 7)
         self.assertTrue(
-            {"summarization", "ner"}
+            {"sentiment", "summarization", "ner"}
             <= {call["category"] for call in client.calls}
         )
 
