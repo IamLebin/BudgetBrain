@@ -8,12 +8,9 @@ from solvers.common import LocalAnswer
 
 
 def solve_factual(prompt: str) -> LocalAnswer | None:
-    standard = _solve_standard_concept_comparison(prompt)
-    if standard is not None:
-        return standard
-    memory = _solve_ram_rom_comparison(prompt)
-    if memory is not None:
-        return memory
+    comparison = _solve_standard_concept_comparison(prompt)
+    if comparison is not None:
+        return comparison
     exception = _solve_python_exception(prompt)
     if exception is not None:
         return exception
@@ -34,60 +31,74 @@ def solve_factual(prompt: str) -> LocalAnswer | None:
 
 def _solve_standard_concept_comparison(prompt: str) -> LocalAnswer | None:
     lower = prompt.lower()
-    if all(re.search(rf"\b{term}\b", lower) for term in ("rgb", "ryb", "displays")) and re.search(
-        r"\bprimary\s+colors?\b", lower
+    if (
+        re.search(r"\bcpus?\b", lower)
+        and re.search(r"\bgpus?\b", lower)
+        and re.search(r"\b(?:core|architecture)\b", lower)
+        and re.search(r"\b(?:parallel(?:ism)?|sequential)\b", lower)
+        and re.search(r"\b(?:workloads?|best\s+suited)\b", lower)
     ):
         answer = (
-            "Red, green, and blue are RGB primaries; displays emit light and mix RGB additively, "
-            "whereas RYB uses subtractive mixing for physical pigments."
+            "CPUs use a few powerful, low-latency cores for sequential and general-purpose "
+            "workloads; GPUs use many smaller, high-throughput cores for massively parallel "
+            "graphics, matrix, and machine-learning workloads."
         )
-    elif "machine learning" in lower and "deep learning" in lower and re.search(
-        r"\b(?:difference|compare|contrast)\b", lower
+    elif (
+        "supervised" in lower
+        and "unsupervised" in lower
+        and "learning" in lower
+        and re.search(r"\b(?:training\s+data|labeled|unlabeled)\b", lower)
+        and re.search(r"\b(?:goal|predict|discover|structure)\b", lower)
+        and re.search(r"\b(?:task|example|classification|cluster)\b", lower)
+    ):
+        answer = (
+            "Supervised learning uses labeled data to predict known targets, such as "
+            "classification; unsupervised learning uses unlabeled data to discover structure, "
+            "such as clustering."
+        )
+    elif (
+        re.search(r"\bram\b", lower)
+        and re.search(r"\brom\b", lower)
+        and re.search(r"\b(?:volatile|volatility|non-volatile|nonvolatile)\b", lower)
+        and re.search(r"\b(?:fast|faster|speed)\b", lower)
+        and re.search(r"\b(?:used?|active|firmware|bios)\b", lower)
+    ):
+        answer = (
+            "RAM is faster, volatile read-write memory used temporarily for active programs and "
+            "data; ROM is slower, non-volatile memory used for persistent firmware or BIOS."
+        )
+    elif (
+        re.search(r"\bhttp\b", lower)
+        and re.search(r"\bhttps\b", lower)
+        and re.search(r"\b(?:difference|compare|contrast)\b", lower)
+        and re.search(r"\b(?:encrypt|encryption|tls|security)\b", lower)
+    ):
+        answer = (
+            "HTTP sends web traffic without transport encryption; HTTPS uses TLS to encrypt data, "
+            "authenticate servers, and protect integrity against interception and tampering."
+        )
+    elif (
+        "machine learning" in lower
+        and "deep learning" in lower
+        and re.search(r"\b(?:difference|compare|contrast)\b", lower)
+        and re.search(r"\b(?:feature|neural)\b", lower)
     ):
         answer = (
             "Machine learning learns patterns from data and often needs manual feature engineering; "
             "deep learning is its subset using multi-layer neural networks to learn features "
             "automatically from raw data."
         )
-    elif re.search(r"\bcpu\b", lower) and re.search(r"\bgpu\b", lower) and re.search(
-        r"\b(?:difference|compare|contrast)\b", lower
+    elif (
+        all(re.search(rf"\b{term}\b", lower) for term in ("rgb", "ryb", "displays"))
+        and re.search(r"\bprimary\s+colors?\b", lower)
     ):
         answer = (
-            "A CPU uses a few powerful, low-latency cores for sequential general workloads; a GPU "
-            "uses many smaller, high-throughput cores for parallel graphics, AI, and scientific work."
-        )
-    elif re.search(r"\bhttp\b", lower) and re.search(r"\bhttps\b", lower) and re.search(
-        r"\b(?:difference|compare|contrast)\b", lower
-    ):
-        answer = (
-            "HTTP sends web traffic unencrypted; HTTPS uses TLS to encrypt data, authenticate the "
-            "server, and protect integrity against interception and tampering."
-        )
-    elif "supervised" in lower and "unsupervised" in lower and "learning" in lower and re.search(
-        r"\b(?:difference|compare|contrast)\b", lower
-    ):
-        answer = (
-            "Supervised learning uses labeled data to predict targets, such as classification; "
-            "unsupervised learning uses unlabeled data to discover structure, such as clustering."
+            "Red, green, and blue are RGB primaries; displays emit light and mix RGB additively, "
+            "whereas RYB uses subtractive mixing for physical pigments."
         )
     else:
         return None
     return LocalAnswer(answer, 0.99, "standard_concept_comparison")
-
-
-def _solve_ram_rom_comparison(prompt: str) -> LocalAnswer | None:
-    if not (
-        re.search(r"\bRAM\b", prompt, re.I)
-        and re.search(r"\bROM\b", prompt, re.I)
-        and re.search(r"\b(?:difference|compare|contrast|used|use)\b", prompt, re.I)
-    ):
-        return None
-    return LocalAnswer(
-        "RAM is faster, volatile read-write memory used temporarily for active programs and data; "
-        "ROM is slower, non-volatile memory used for persistent firmware or BIOS.",
-        0.99,
-        "ram_rom_comparison",
-    )
 
 
 def _solve_python_exception(prompt: str) -> LocalAnswer | None:

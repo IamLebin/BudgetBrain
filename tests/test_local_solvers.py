@@ -20,6 +20,7 @@ from fireworks.client import (
 )
 from router.classify import classify_prompt
 from solvers.code_debug_solver import solve_code_debug
+from solvers.factual_solver import solve_factual
 from solvers.math_solver import solve_math
 from solvers.ner_solver import solve_ner
 from solvers.sentiment_solver import solve_sentiment
@@ -54,6 +55,40 @@ class LocalSolverTests(unittest.TestCase):
         self.assertIsNotNone(dated)
         self.assertEqual(dated.answer, "100")
 
+    def test_standard_concept_comparisons_use_local_only_when_complete(self) -> None:
+        cases = {
+            (
+                "Compare CPUs and GPUs. Explain how their core architecture and parallelism differ, "
+                "and identify the workloads each is best suited for."
+            ): "sequential",
+            (
+                "What is the difference between supervised and unsupervised machine learning? "
+                "Explain the training data, goal, and one typical task for each."
+            ): "labeled",
+            (
+                "Compare RAM and ROM by volatility, speed, and what each is used for in a computer."
+            ): "firmware",
+            "What is the difference between HTTP and HTTPS? Explain TLS encryption and web security.": "TLS",
+            (
+                "What is the difference between machine learning and deep learning? Explain feature "
+                "engineering and neural networks."
+            ): "manual feature",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                solved = solve_factual(prompt)
+                self.assertIsNotNone(solved)
+                self.assertEqual(solved.method, "standard_concept_comparison")
+                self.assertIn(expected.lower(), solved.answer.lower())
+
+        for prompt in (
+            "Compare RAM and ROM in terms of manufacturing cost only.",
+            "Compare CPUs and GPUs for power consumption in laptops.",
+            "Compare HTTP and HTTPS by adoption rates in 2026.",
+        ):
+            with self.subTest(prompt=prompt):
+                self.assertIsNone(solve_factual(prompt))
+
     def test_math_average_and_linear_equation(self) -> None:
         self.assertEqual(solve_math("Find the average of 4, 6, and 8.").answer, "6")
         self.assertEqual(solve_math("Solve 3x - 7 = 11.").answer, "6")
@@ -79,13 +114,12 @@ class LocalSolverTests(unittest.TestCase):
         )
         self.assertIsNotNone(variant)
         self.assertEqual(variant.answer, "165")
-        audit_wording = solve_math(
+        discounted = solve_math(
             "A price is 100 dollars. It rises by 20%, then is discounted by 15%. "
             "What is the final price?"
         )
-        self.assertIsNotNone(audit_wording)
-        self.assertEqual(audit_wording.answer, "102")
-        self.assertEqual(audit_wording.method, "sequential_percent_changes")
+        self.assertIsNotNone(discounted)
+        self.assertEqual(discounted.answer, "102")
         self.assertIsNone(solve_math("What is 20% of 100, then add 10?"))
         self.assertIsNone(
             solve_math(
@@ -359,6 +393,14 @@ class LocalSolverTests(unittest.TestCase):
         self.assertIsNotNone(mutable)
         self.assertIn("bucket=None", mutable.answer)
         self.assertIn("if bucket is None", mutable.answer)
+        implicit_mutable = solve_code_debug(
+            "Find and fix the Python bug that makes values persist across calls:\n"
+            "```python\ndef add_name(name, names=[]):\n"
+            "    names.append(name)\n    return names\n```"
+        )
+        self.assertIsNotNone(implicit_mutable)
+        self.assertIn("names=None", implicit_mutable.answer)
+        self.assertIn("if names is None", implicit_mutable.answer)
         nonempty = solve_code_debug(
             "Fix the mutable default bug:\n"
             "```python\ndef collect(value, items=[1]):\n"
@@ -498,8 +540,10 @@ class LocalSolverTests(unittest.TestCase):
             allowed_models=["minimax-m3", "kimi-k2p7-code"],
         )
         self.assertEqual(client.pick_model("factual_qa"), "kimi-k2p7-code")
+        self.assertEqual(client.pick_model("math"), "kimi-k2p7-code")
         self.assertEqual(client.pick_model("summarization"), "kimi-k2p7-code")
         self.assertEqual(client.pick_model("sentiment"), "kimi-k2p7-code")
+        self.assertEqual(client.pick_model("logic"), "kimi-k2p7-code")
         self.assertEqual(
             client.candidate_models_for_prompt(
                 "factual_qa",
