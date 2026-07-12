@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from reportlab import rl_config
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape
 from reportlab.lib.units import inch
@@ -10,7 +11,6 @@ from reportlab.pdfgen import canvas
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "submission_assets"
 PDF = OUT / "budgetbrain_pitch_deck.pdf"
-COVER = OUT / "cover.png"
 SCRIPT = OUT / "video_presentation_script.txt"
 
 PAGE_W, PAGE_H = 1280, 720
@@ -22,6 +22,17 @@ RED = colors.HexColor("#E31B2F")
 PANEL = colors.HexColor("#F3F5F8")
 LINE = colors.HexColor("#D6DBE3")
 DARK = colors.HexColor("#0B0D10")
+
+LEADERBOARD_BASELINE_COMMIT = "1393b47"
+LEADERBOARD_RANK = "34"
+LEADERBOARD_ACCURACY = "89.5%"
+LEADERBOARD_TOKENS = "5,093"
+CURRENT_RELEASE_COMMIT = "Pending until commit"
+UNIT_TESTS = "79 / 79 passing"
+OFFLINE_STRICT = "10 / 10 passing"
+OFFLINE_AUDIT = "19 / 19 passing"
+DOCKER_TAG = "Pending / to be filled"
+DOCKER_DIGEST = "Pending / to be filled"
 
 
 def fit_text(c, text, max_width, font="Helvetica-Bold", size=56, min_size=32):
@@ -93,13 +104,32 @@ def bullets(c, items, x, y, width, size=24):
 
 def create_pdf():
     OUT.mkdir(parents=True, exist_ok=True)
-    c = canvas.Canvas(str(PDF), pagesize=landscape((PAGE_H, PAGE_W)))
+    rl_config.useA85 = 0
+    c = canvas.Canvas(str(PDF), pagesize=landscape((PAGE_H, PAGE_W)), pageCompression=1)
 
     # 1. Cover
     c.setFillColor(DARK)
     c.rect(0, 0, PAGE_W, PAGE_H, fill=1, stroke=0)
-    if COVER.exists():
-        c.drawImage(str(COVER), 0, 0, width=PAGE_W, height=PAGE_H, preserveAspectRatio=True, anchor="c")
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 66)
+    c.drawString(92, 520, "BudgetBrain")
+    c.setFillColor(RED)
+    c.drawString(92, 438, "Track 1 Champion Agent")
+    c.setFillColor(colors.HexColor("#D1D5DB"))
+    c.setFont("Helvetica", 28)
+    c.drawString(96, 354, "Accurate answers. Controlled tokens. Docker-ready contract.")
+    c.setStrokeColor(RED)
+    c.setLineWidth(5)
+    c.line(96, 314, 1184, 314)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 22)
+    c.drawString(96, 250, "OFFICIAL LEADERBOARD BASELINE")
+    c.setFont("Helvetica", 22)
+    c.drawString(96, 212, "Commit 1393b47  |  Rank 34  |  89.5% accuracy  |  5,093 tokens")
+    c.setFont("Helvetica-Bold", 22)
+    c.drawString(96, 142, "CURRENT RELEASE VALIDATION")
+    c.setFont("Helvetica", 22)
+    c.drawString(96, 104, "Commit pending  |  79/79 tests  |  strict 10/10  |  audit 19/19")
     c.showPage()
 
     # 2. The challenge
@@ -169,14 +199,14 @@ def create_pdf():
     c.showPage()
 
     # 5. Evidence
-    title(c, "Validated before submission", "The build was tested across local, Docker, held-out, stress, and real Fireworks runs.")
+    title(c, "Evidence snapshot", "Official leaderboard evidence is reported separately from offline regression fixtures.")
     rows = [
-        ("Unit tests", "33 / 33 passing"),
-        ("Official practice", "8 / 8 local and 8 / 8 real Fireworks"),
-        ("Held-out set", "16 / 16 passing"),
-        ("Reasoning stress", "8 / 8 passing"),
-        ("Real complex stress", "8 / 8, 1497 Fireworks tokens"),
-        ("Image size", "45.5 MB linux/amd64 Docker image"),
+        ("Leaderboard baseline commit", LEADERBOARD_BASELINE_COMMIT),
+        ("Official leaderboard", f"Rank {LEADERBOARD_RANK}"),
+        ("Official hidden result", f"{LEADERBOARD_ACCURACY}, {LEADERBOARD_TOKENS} tokens"),
+        ("Current release commit", CURRENT_RELEASE_COMMIT),
+        ("Unit tests", UNIT_TESTS),
+        ("Offline validation", f"strict {OFFLINE_STRICT}; audit {OFFLINE_AUDIT}"),
     ]
     left, top = 150, 490
     for idx, (label, value) in enumerate(rows):
@@ -193,14 +223,14 @@ def create_pdf():
     c.showPage()
 
     # 6. Submission
-    title(c, "Ready for the Track 1 evaluator", "The public Docker image is available for the official form and anonymous pull verification has passed.")
+    title(c, "Release artifact pending", "Do not attach a historical Docker tag or digest to the current source snapshot.")
     bullets(
         c,
         [
-            "Docker image: lebinbin/budgetbrain-track1:amd-act2-20260710",
-            "Digest: sha256:bb74ac8bf2d2c089a236f578ef82e10e0a9316430fc8f2293bf23468badfedc6",
+            f"Docker image: {DOCKER_TAG}",
+            f"Digest: {DOCKER_DIGEST}",
             "Runtime contract: read /input/tasks.json and write /output/results.json.",
-            "Final objective: clear the accuracy gate, then compete on token efficiency and reliability.",
+            "Offline fixtures are regression checks, not official hidden-evaluator results.",
         ],
         MARGIN_X,
         460,
@@ -217,19 +247,17 @@ def create_pdf():
 
 
 def create_script():
-    text = """Video presentation script - 60 to 75 seconds
+    text = f"""Video presentation script - 60 to 75 seconds
 
-Hi, this is BudgetBrain Track 1 Champion Agent, our submission for AMD Developer Hackathon Act II Track 1.
+Hi, this is BudgetBrain Track 1 Champion Agent, our submission for AMD Developer Hackathon ACT II Track 1.
 
-The challenge is simple on the surface but difficult in evaluation: the system receives only task_id and prompt, without an explicit category. It must infer the task type, answer correctly, write the exact results.json format, and stay efficient under Docker, runtime, and token constraints.
+Track 1 provides only a task ID and prompt. The agent must infer the task type, return the exact results JSON contract, stay reliable in a Linux AMD64 container, and control model-token usage without sacrificing correctness.
 
-BudgetBrain solves this with a hybrid strategy. First, a lightweight router classifies the prompt. Then deterministic local solvers handle categories like math, sentiment, named entities, logic, and code debugging whenever the answer can be produced confidently without model tokens. For harder or ambiguous prompts, the agent uses Fireworks models as a controlled fallback, with allowed-model gating, short timeouts, retries, and output normalization.
+BudgetBrain uses a hybrid strategy. Narrow deterministic solvers handle tasks only when their outputs can be verified. Harder or ambiguous prompts use runtime-allowed Fireworks models with output validation and fallback handling. Accuracy remains the first priority, and token reduction is applied only to proven local paths.
 
-This gives us two advantages: high reliability on structured tasks and much lower token usage because simple prompts do not need an external model call.
+The official leaderboard baseline is commit {LEADERBOARD_BASELINE_COMMIT}: rank {LEADERBOARD_RANK}, {LEADERBOARD_ACCURACY} hidden accuracy, and {LEADERBOARD_TOKENS} tokens. That score does not represent the current uncommitted release worktree. Current release validation passes 79 of 79 unit tests, a 10-of-10 offline strict fixture, and a 19-of-19 offline audit. Those offline fixtures validate regressions and are not claims about hidden accuracy.
 
-The final image is public on Docker Hub as lebinbin/budgetbrain-track1:amd-act2-20260710. It follows the official contract, reads /input/tasks.json, writes /output/results.json, runs on linux/amd64, and contains no API keys. We validated it with unit tests, official practice tests, held-out tasks, reasoning stress tests, Docker runs, and real Fireworks calls.
-
-Our goal is to pass the hidden accuracy gate and compete for the top leaderboard position through accuracy, speed, and token efficiency.
+The Track 1 container reads /input/tasks.json and writes /output/results.json. Its Fireworks credentials and allowed models are injected only at runtime. The current release commit, Docker tag, and digest are pending final commit, build, publication, and anonymous verification.
 """
     SCRIPT.write_text(text, encoding="utf-8")
 

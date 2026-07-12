@@ -87,7 +87,11 @@ contract above and avoid hardcoded/cached answers.
 - Docker image builds, runs, and is pullable clean on a fresh machine
 - No category silently fails or times out
 
-## Current competitive target (July 12, 2026)
+## Archived Competitive Snapshot (Historical, July 12, 2026)
+
+This section records the earlier v7 release state and contemporaneous leaderboard observations.
+It is not the current release status; use `README.md` and `SUBMISSION.md` for current evidence.
+
 - Lowest visible nonzero result: `1,763` tokens at `84.2%` (`16/19`).
 - Best visible nonzero 100% result: `2,520` tokens.
 - V7 preserves the latest verified local solvers and strict output checks, while restoring

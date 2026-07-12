@@ -1,13 +1,11 @@
 Video presentation script - 60 to 75 seconds
 
-Hi, this is BudgetBrain Track 1 Champion Agent, our submission for AMD Developer Hackathon Act II Track 1.
+Hi, this is BudgetBrain Track 1 Champion Agent, our submission for AMD Developer Hackathon ACT II Track 1.
 
-The challenge is simple on the surface but difficult in evaluation: the system receives only task_id and prompt, without an explicit category. It must infer the task type, answer correctly, write the exact results.json format, and stay efficient under Docker, runtime, and token constraints.
+Track 1 provides only a task ID and prompt. The agent must infer the task type, return the exact results JSON contract, stay reliable in a Linux AMD64 container, and control model-token usage without sacrificing correctness.
 
-BudgetBrain solves this with a hybrid strategy. First, a lightweight router classifies the prompt. Then deterministic local solvers handle categories like math, sentiment, named entities, logic, and code debugging whenever the answer can be produced confidently without model tokens. For harder or ambiguous prompts, the agent uses Fireworks models as a controlled fallback, with allowed-model gating, short timeouts, retries, and output normalization.
+BudgetBrain uses a hybrid strategy. Narrow deterministic solvers handle tasks only when their outputs can be verified. Harder or ambiguous prompts use runtime-allowed Fireworks models with output validation and fallback handling. Accuracy remains the first priority, and token reduction is applied only to proven local paths.
 
-This gives us two advantages: high reliability on structured tasks and much lower token usage because simple prompts do not need an external model call.
+The official leaderboard baseline is commit 1393b47: rank 34, 89.5% hidden accuracy, and 5,093 tokens. That score does not represent the current uncommitted release worktree. Current release validation passes 79 of 79 unit tests, a 10-of-10 offline strict fixture, and a 19-of-19 offline audit. Those offline fixtures validate regressions and are not claims about hidden accuracy.
 
-The final image is public on Docker Hub as lebinbin/budgetbrain-track1:amd-act2-20260710. It follows the official contract, reads /input/tasks.json, writes /output/results.json, runs on linux/amd64, and contains no API keys. We validated it with unit tests, official practice tests, held-out tasks, reasoning stress tests, Docker runs, and real Fireworks calls.
-
-Our goal is to pass the hidden accuracy gate and compete for the top leaderboard position through accuracy, speed, and token efficiency.
+The Track 1 container reads /input/tasks.json and writes /output/results.json. Its Fireworks credentials and allowed models are injected only at runtime. The current release commit, Docker tag, and digest are pending final commit, build, publication, and anonymous verification.

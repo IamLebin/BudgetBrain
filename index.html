@@ -504,14 +504,19 @@ async function run() {
   results.classList.remove('on');
   errEl.classList.remove('on');
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
   try {
     const res  = await fetch('/api/solve', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ prompt }),
+      signal:  controller.signal,
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
+    if (!res.ok) throw new Error('The demo service could not complete this request.');
 
     // Answer
     document.getElementById('answer').textContent = data.answer;
@@ -545,9 +550,13 @@ async function run() {
 
     results.classList.add('on');
   } catch (err) {
-    errEl.textContent = '⚠ ' + err.message;
+    const message = err.name === 'AbortError'
+      ? 'Request timed out after 30 seconds. Please try again.'
+      : (err.message || 'The demo request failed. Please try again.');
+    errEl.textContent = '⚠ ' + message;
     errEl.classList.add('on');
   } finally {
+    clearTimeout(timeoutId);
     runBtn.disabled = false;
     loading.classList.remove('on');
   }

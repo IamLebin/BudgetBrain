@@ -72,6 +72,12 @@ Current after the latest Discord/guide clarification.
 - [x] Dockerfile builds as `linux/amd64`
 - [x] Image is far under `10GB`
 - [x] Container reads `/input/tasks.json` and writes `/output/results.json`
+
+### Archived Docker Candidates (Historical, Not Current Release)
+
+These candidate names and sizes document previous builds only. The current release tag and digest
+remain pending and are tracked in `README.md` and `SUBMISSION.md`.
+
 - [x] Final local candidate `budgetbrain-track1:champion-v2` is `linux/amd64`, `45,525,751` bytes
 - [x] V3 release candidate `budgetbrain-track1:champion-v3-plain` is a single `linux/amd64`
   manifest, `45,527,752` bytes
@@ -95,7 +101,11 @@ Current after the latest Discord/guide clarification.
   `IMAGE_TOO_LARGE`, `ACCURACY_GATE_FAILED`
 - [ ] Use registry download counter to confirm evaluator pulled the image
 
-## 7. Publication
+## 7. Archived Publication History (Historical, Not Current Release)
+
+The tags and digests below are retained only as a record of earlier approved releases. Do not use
+them as the current submission image.
+
 - [x] Public release explicitly approved and pushed as
   `lebinbin/budgetbrain-track1:amd-act2-20260710`
 - [x] Public repository and anonymous pull verified
@@ -114,5 +124,10 @@ Current after the latest Discord/guide clarification.
 - [x] Push and anonymously verify the immutable v7 tag
 - [x] Record the v7 digest:
   `sha256:b055c0f05104736c936620d7687639a1a4e4d50abb6344e3f3070efe265198db`
-- [ ] Enter the current full reference in the form and re-save the submission:
-  `docker.io/lebinbin/budgetbrain-track1:amd-act2-20260712-champion-v7`
+
+## 8. Current Release Publication
+
+- [ ] Commit the reviewed worktree and record the exact release commit.
+- [ ] Build and verify the exact `linux/amd64` image for that commit.
+- [ ] Record the new immutable tag and digest; both are pending / to be filled.
+- [ ] Publish and update the submission form only after explicit approval.

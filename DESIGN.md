@@ -106,7 +106,12 @@ become your evidence log, not just a plan.
 3. Only escalate a category to a bigger/more expensive model if the cheaper one fails your
    local accuracy bar.
 
-## Current validation snapshot
+## Archived Validation Snapshot (Historical, Not Current Release)
+
+The results below document earlier optimization work and v7 publication history. They are retained
+for engineering traceability only and must not be presented as the current release status. See
+`README.md` and `SUBMISSION.md` for the official leaderboard baseline and current validation.
+
 - Unit tests: `73/73` passing.
 - Offline fixtures: baseline `8/8`, official practice `8/8`, held-out `16/16`, local champion
   `17/17` with zero model calls, and reasoning stress `8/8` with two model calls.
