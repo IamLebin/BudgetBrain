@@ -6,7 +6,7 @@ import sqlite3
 import unittest
 
 from app.agent import solve_prompt
-from eval.run_local_eval import FakeFireworksClient
+from eval.run_local_eval import FakeFireworksClient, _answer_matches
 from solvers.code_generation_solver import solve_code_generation
 from solvers.factual_solver import solve_factual
 from solvers.math_solver import solve_math
@@ -15,6 +15,20 @@ from solvers.summarization_solver import solve_summarization
 
 
 class AlgorithmSolverTests(unittest.TestCase):
+    def test_strict_eval_rejects_missing_content_and_format(self) -> None:
+        item = {
+            "contains": ["benefit", "risk"],
+            "exact_bullets": 2,
+            "max_words_per_bullet": 4,
+        }
+        self.assertTrue(_answer_matches("- Benefit is clear.\n- Risk remains high.", item))
+        self.assertFalse(_answer_matches("- Benefit is clear.\n- Response is ready.", item))
+        self.assertFalse(_answer_matches("- Benefit is very clearly described here.\n- Risk remains high.", item))
+        self.assertFalse(_answer_matches("Benefit and risk are covered.", item))
+        grouped = {"contains_any_groups": [["set up", "setup"], ["dented", "damaged"]]}
+        self.assertTrue(_answer_matches("The dented device was easy to set up.", grouped))
+        self.assertFalse(_answer_matches("The device worked well.", grouped))
+
     def test_python_generators_execute(self) -> None:
         cases = (
             (
@@ -104,6 +118,50 @@ class AlgorithmSolverTests(unittest.TestCase):
                 self.assertEqual(solved.answer, expected)
                 self.assertEqual(solved.method, "median")
         self.assertIsNone(solve_math("Find the median salary for each department."))
+
+    def test_retired_public_multi_step_math(self) -> None:
+        inventory = solve_math(
+            "A warehouse starts with 2,400 units. In Q1 it sells 37% of stock. "
+            "In Q2 it restocks 800 units. In Q3 it sells 640 units. "
+            "How many units remain at the end of Q3?"
+        )
+        self.assertIsNotNone(inventory)
+        self.assertEqual(inventory.answer, "1672")
+
+        recipe = solve_math(
+            "A recipe requires 3/4 cup of sugar for 12 cookies. How much sugar is needed "
+            "for 30 cookies? If sugar costs $2.40 per cup, what is the total cost?"
+        )
+        self.assertIsNotNone(recipe)
+        self.assertEqual(recipe.answer, "1.875 cups; $4.50")
+
+    def test_practice_q11_to_q20_math_is_deterministic(self) -> None:
+        cases = {
+            "A company has 5,000 employees. 60% are in the US, 25% in Europe, and the rest in Asia. How many employees are in Asia?": "750",
+            "If a train travels at 80 km/h for 2.5 hours, then at 100 km/h for 1.5 hours, what is the total distance traveled?": "350 km",
+            "A store offers a 15% discount on a laptop originally priced at $1,200. After the discount, sales tax of 8% is added. What is the final price?": "$1101.60",
+            "A project requires 120 hours of work. If 4 people work on it for 6 hours per day, how many days will it take to complete?": "5 days",
+            "A population of bacteria doubles every 3 hours. If it starts with 500 bacteria, how many will there be after 12 hours?": "8000",
+            "A rectangle has a perimeter of 48 meters and a length that is twice its width. What are the dimensions of the rectangle?": "Length 16 m; Width 8 m",
+            "An investment of $5,000 grows at 4% annual interest compounded annually. What is the value after 3 years?": "$5624.32",
+            "A pizza is cut into 8 slices. If you eat 3/8 of the pizza and your friend eats 1/4 of the pizza, what fraction of the pizza is left?": "3/8",
+            "A car rental company charges $45 per day plus $0.25 per mile driven. If a customer rents for 4 days and drives 300 miles, what is the total cost?": "$255.00",
+            "A container holds 2.5 liters of liquid. How many 200-milliliter cups can be filled from this container?": "12.5 cups",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                solved = solve_math(prompt)
+                self.assertIsNotNone(solved)
+                self.assertEqual(solved.answer, expected)
+                self.assertGreaterEqual(solved.confidence, 0.98)
+
+    def test_requested_sentiment_reason_forces_remote(self) -> None:
+        prompt = (
+            "Classify as Positive, Negative, or Neutral and give a one-sentence reason: "
+            "'Delivery was late, but support resolved the issue.'"
+        )
+        client = FakeFireworksClient({prompt: "Neutral: It includes a problem and a positive resolution."})
+        self.assertEqual(solve_prompt(prompt, client=client).source, "fireworks")
 
     def test_short_unambiguous_sentiment_uses_strong_local_path(self) -> None:
         cases = {
@@ -201,13 +259,17 @@ class AlgorithmSolverTests(unittest.TestCase):
                 self.assertIsNotNone(solved)
                 self.assertIn(solved.method, {"short_source_passthrough", "already_one_sentence"})
 
-    def test_fixture_routing_reduces_remote_calls_without_changing_answers(self) -> None:
+    def test_fixture_routing_keeps_semantic_tasks_remote(self) -> None:
         fixture = json.loads(Path("eval/fixtures/held_out.json").read_text(encoding="utf-8"))
         responses = {str(item["prompt"]): str(item.get("fake_answer", "ok")) for item in fixture}
         client = FakeFireworksClient(responses)
         for item in fixture:
             solve_prompt(str(item["prompt"]), client=client)
-        self.assertLessEqual(len(client.calls), 2)
+        self.assertEqual(len(client.calls), 7)
+        self.assertTrue(
+            {"sentiment", "summarization", "ner"}
+            <= {call["category"] for call in client.calls}
+        )
 
 
 if __name__ == "__main__":

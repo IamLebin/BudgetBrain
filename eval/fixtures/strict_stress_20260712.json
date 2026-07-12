@@ -1,0 +1,94 @@
+[
+  {
+    "task_id": "S01",
+    "category": "factual_qa",
+    "prompt": "Compare CPUs and GPUs. Explain how their core architecture and parallelism differ, and identify the workloads each is best suited for.",
+    "fake_answer": "CPUs use a few powerful, low-latency cores for sequential and general-purpose workloads; GPUs use many smaller, high-throughput cores for massively parallel graphics, matrix, and machine-learning workloads.",
+    "contains": ["CPU", "GPU", "cores", "sequential", "parallel", "latency", "throughput", "workload"],
+    "contains_any_groups": [["few", "small number"], ["many", "thousands"]]
+  },
+  {
+    "task_id": "S02",
+    "category": "factual_qa",
+    "prompt": "What is the difference between supervised and unsupervised machine learning? Explain the training data, goal, and one typical task for each.",
+    "fake_answer": "Supervised learning uses labeled data to predict known targets, such as classification; unsupervised learning uses unlabeled data to discover structure, such as clusters.",
+    "contains": ["supervised", "unsupervised", "labeled", "unlabeled", "predict", "classification", "structure", "cluster"]
+  },
+  {
+    "task_id": "S03",
+    "category": "math",
+    "prompt": "A depot starts with 5,000 parts. In Q1 it ships 42% of them. In Q2 it restocks 1,250 parts. In Q3 it ships 875 parts. How many parts remain?",
+    "expected": "3275"
+  },
+  {
+    "task_id": "S04",
+    "category": "math",
+    "prompt": "A recipe requires 2/3 cup of flour for 8 muffins. How much flour is needed for 20 muffins? If flour costs $3.60 per cup, what is the total flour cost?",
+    "fake_answer": "20 muffins need 1.666666667 cups of flour, costing $6.00.",
+    "contains": ["1.666", "6.00"]
+  },
+  {
+    "task_id": "S05",
+    "category": "sentiment",
+    "prompt": "Classify this review as Positive, Negative, or Neutral and give exactly one sentence of reasoning: 'The battery lasts all day, but the screen arrived cracked; thankfully the replacement came overnight and works flawlessly.'",
+    "fake_answer": "Positive — the all-day battery, overnight replacement, and flawless result outweigh the cracked original screen.",
+    "contains": ["battery", "cracked", "replacement", "overnight", "flawless"],
+    "allowed_labels": ["Positive", "Neutral", "Mixed"],
+    "exact_sentences": 1
+  },
+  {
+    "task_id": "S06",
+    "category": "sentiment",
+    "prompt": "Classify this review as Positive, Negative, or Neutral and give exactly one sentence of reasoning: 'Great, another update that deleted my settings and now crashes every time I open it.'",
+    "fake_answer": "Negative — 'Great' is sarcastic because the update deleted settings and repeatedly crashes.",
+    "contains": ["sarcast", "deleted", "settings", "crash"],
+    "allowed_labels": ["Negative"],
+    "exact_sentences": 1
+  },
+  {
+    "task_id": "S07",
+    "category": "summarization",
+    "prompt": "Summarize this passage in exactly two sentences: 'AI security tools automate threat detection, correlate alerts, and accelerate incident response. They can identify patterns across volumes of telemetry that humans cannot review manually. However, false positives, employee privacy, adversarial manipulation, and overreliance on automation create serious risks. Human oversight and clear accountability remain necessary for safe deployment.'",
+    "fake_answer": "AI security tools automate detection, correlate alerts, accelerate response, and find patterns across large telemetry volumes. False positives, privacy, adversarial manipulation, and automation overreliance require human oversight and accountability.",
+    "contains": ["automate", "detection", "alerts", "response", "patterns", "false positives", "privacy", "adversarial", "overreliance", "oversight", "accountability"],
+    "exact_sentences": 2
+  },
+  {
+    "task_id": "S08",
+    "category": "summarization",
+    "prompt": "Summarize this passage in exactly four bullet points, each no longer than 12 words: 'Renewable energy reduces emissions and dependence on fossil fuels. Solar and wind output varies with weather, creating intermittency challenges. Grid upgrades and energy storage help balance supply and demand. Governments are using policy incentives while companies increase clean-energy investment.'",
+    "fake_answer": "- Renewable energy reduces emissions and fossil-fuel dependence.\n- Weather-driven solar and wind create intermittency.\n- Grid upgrades and storage balance supply and demand.\n- Policy incentives and corporate investment accelerate clean energy.",
+    "contains": ["emissions", "fossil", "weather", "intermittency", "grid", "storage", "policy", "investment"],
+    "exact_bullets": 4,
+    "max_words_per_bullet": 12
+  },
+  {
+    "task_id": "S09",
+    "category": "ner",
+    "prompt": "Extract all named entities and label each as PERSON, ORGANIZATION, LOCATION, or DATE: 'On 4 July 2024, Dr. Amina Rahman from World Health Organization met Microsoft CEO Satya Nadella in Nairobi.'",
+    "fake_answer": "4 July 2024 DATE; Amina Rahman PERSON; World Health Organization ORGANIZATION; Microsoft ORGANIZATION; Satya Nadella PERSON; Nairobi LOCATION",
+    "entity_labels": [
+      {"text": "4 July 2024", "label": "DATE"},
+      {"text": "Amina Rahman", "label": "PERSON"},
+      {"text": "World Health Organization", "label": "ORGANIZATION"},
+      {"text": "Microsoft", "label": "ORGANIZATION"},
+      {"text": "Satya Nadella", "label": "PERSON"},
+      {"text": "Nairobi", "label": "LOCATION"}
+    ],
+    "exact_entity_count": 6
+  },
+  {
+    "task_id": "S10",
+    "category": "ner",
+    "prompt": "Extract all named entities and label each as PERSON, ORGANIZATION, LOCATION, or DATE: 'Apple CEO Tim Cook spoke at Stanford University in California on September 9, 2025.'",
+    "fake_answer": "Apple ORGANIZATION; Tim Cook PERSON; Stanford University ORGANIZATION; California LOCATION; September 9, 2025 DATE",
+    "entity_labels": [
+      {"text": "Apple", "label": "ORGANIZATION"},
+      {"text": "Tim Cook", "label": "PERSON"},
+      {"text": "Stanford University", "label": "ORGANIZATION"},
+      {"text": "California", "label": "LOCATION"},
+      {"text": "September 9, 2025", "label": "DATE"}
+    ],
+    "exact_entity_count": 5
+  }
+]

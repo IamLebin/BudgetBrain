@@ -48,8 +48,17 @@ SYSTEM_PROMPTS = {
         "Unless the user asks for detail, use one sentence of at most 35 words with no preamble."
     ),
     "math": "Solve carefully and verify the arithmetic. Follow the requested format and detail level.",
-    "sentiment": "Classify the full text using only allowed labels. Briefly justify when requested.",
-    "summarization": "Preserve key facts and obey every length, count, and format constraint.",
+    "sentiment": (
+        "Classify the full text using only allowed labels. When a reason is requested, explicitly "
+        "mention every positive and negative aspect from the input instead of grouping or "
+        "generalizing them; preserve concrete timing, quantity, delivery, damage, and resolution "
+        "details, and obey the requested sentence count."
+    ),
+    "summarization": (
+        "Preserve key facts and obey every length, count, and format constraint. Cover every "
+        "explicitly listed capability, benefit, drawback, risk, cause, response, and named actor "
+        "when the requested length allows it; compress wording instead of dropping an enumerated item."
+    ),
     "ner": (
         "Extract all entities in the requested format using PERSON, ORG, LOCATION, and DATE "
         "unless labels are provided."
@@ -65,6 +74,63 @@ SYSTEM_PROMPTS = {
         "Do not add validation or edge-case behavior that was not requested."
     ),
 }
+
+
+def _system_prompt(category: str, prompt: str) -> str:
+    base = SYSTEM_PROMPTS.get(category, SYSTEM_PROMPTS["factual_qa"])
+    if category == "factual_qa" and re.search(r"\b(?:define|what\s+is|explain\s+what)\b", prompt, re.I):
+        base += " For technical definitions, state the core mechanism, not only the purpose or outcome."
+    example_request = re.search(
+        r"\b(?:provide|give|name)\s+(two|three|2|3)\b.{0,30}\bexamples?\b",
+        prompt,
+        re.I,
+    )
+    if category == "factual_qa" and example_request is not None:
+        count = {"two": "2", "three": "3"}.get(
+            example_request.group(1).lower(),
+            example_request.group(1),
+        )
+        base += f" Provide exactly {count} examples labeled Example 1, Example 2, and so on."
+    if category == "factual_qa" and _is_comparison_question(prompt):
+        comparison = (
+            base
+            + " For comparisons, explicitly state hierarchy or subset relationships and contrast "
+            "mechanism, feature handling, key properties such as volatility and relative speed, "
+            "and uses whenever relevant. Do not omit a comparison dimension."
+        )
+        if _is_ml_deep_comparison(prompt):
+            comparison += (
+                " Explicitly contrast manual feature engineering in traditional machine learning "
+                "with automatic feature learning in deep neural networks."
+            )
+        return comparison
+    if category == "summarization" and re.search(r"\bbullet\s+points?\b", prompt, re.I):
+        return (
+            base
+            + " Use each requested bullet for a different major theme. When present, cover benefits, "
+            "drawbacks or risks, and responses; do not repeat one theme while omitting another."
+        )
+    if category == "ner":
+        return base + " Copy the user's label names exactly; do not abbreviate ORGANIZATION as ORG."
+    return base
+
+
+def _is_comparison_question(prompt: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(?:difference\s+between|compare|comparison|contrast|versus|vs\.?|"
+            r"how\s+does\s+.+\s+differ\s+from)\b",
+            prompt,
+            re.I,
+        )
+    )
+
+
+def _is_ml_deep_comparison(prompt: str) -> bool:
+    return bool(
+        re.search(r"\bmachine\s+learning\b", prompt, re.I)
+        and re.search(r"\b(?:deep\s+learning|deep\s+neural|neural\s+network)\b", prompt, re.I)
+    )
 
 
 class FireworksError(RuntimeError):
@@ -94,12 +160,12 @@ class FireworksClient:
     def solve(self, prompt: str, category: str) -> str:
         self.last_tokens_used = None
         errors: list[str] = []
-        for model in self.candidate_models(category):
+        for model in self.candidate_models_for_prompt(category, prompt):
             api_model = model_id_for_request(model, self.base_url)
             payload = {
                 "model": api_model,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPTS.get(category, SYSTEM_PROMPTS["factual_qa"])},
+                    {"role": "system", "content": _system_prompt(category, prompt)},
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0,
@@ -156,6 +222,23 @@ class FireworksClient:
         for model in self.allowed_models:
             if model not in candidates:
                 candidates.append(model)
+        return candidates
+
+    def candidate_models_for_prompt(self, category: str, prompt: str) -> list[str]:
+        candidates = self.candidate_models(category)
+        if (
+            category == "factual_qa" and _is_comparison_question(prompt)
+        ) or (
+            category == "factual_qa"
+            and re.search(r"\bexplain\b", prompt, re.I)
+            and re.search(r"\b(?:and|then)\s+(?:name|list|provide|give)\b", prompt, re.I)
+        ) or (
+            category == "summarization" and re.search(r"\bbullet\s+points?\b", prompt, re.I)
+        ) or (
+            category == "sentiment"
+            and re.search(r"\b(?:reason|reasoning|justify|explain)\b", prompt, re.I)
+        ):
+            candidates.sort(key=lambda model: canonical_model_name(model) != "minimax-m3")
         return candidates
 
     def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -320,7 +403,9 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
         if fenced_json:
             answer = fenced_json.group(1).strip()
         answer = re.sub(r"\bGPE\b", "LOCATION", answer, flags=re.I)
-        answer = re.sub(r"\bORGANIZATIONS?\b|\bORGANISATIONS?\b", "ORG", answer, flags=re.I)
+        instruction = prompt.split(":", maxsplit=1)[0]
+        if re.search(r"\bORGANIZATIONS?\b|\bORGANISATIONS?\b", instruction, re.I):
+            answer = re.sub(r"\bORG\b", "ORGANIZATION", answer)
     if category == "math" and not re.search(
         r"\b(explain|steps?|reasoning|derive)\b|\bshow\s+(?:your\s+)?work\b",
         prompt,
@@ -338,7 +423,7 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
         if re.match(r"^[+-]?(?:\d|\.\d)", first_line):
             return first_line.rstrip(".")
     if category == "sentiment" and not re.search(
-        r"\b(justify|explain|reason|why)\b", prompt, re.I
+        r"\b(justify|explain|reason(?:ing)?|why)\b", prompt, re.I
     ):
         label = re.search(
             r"\b(positive|negative|neutral|mixed|favorable|unfavorable|"
@@ -348,6 +433,22 @@ def clean_model_answer(content: str, category: str, prompt: str = "") -> str:
         )
         if label:
             return label.group(1).lower()
+    if category == "sentiment" and re.search(
+        r"\b(?:justify|explain|reason(?:ing)?|why)\b", prompt, re.I
+    ):
+        joined = re.sub(r"\s*\n+\s*", " ", answer).strip()
+        labelled_reason = re.match(
+            r"^\s*[*_`]*(positive|negative|neutral|mixed|favorable|unfavorable|"
+            r"favourable|unfavourable)[*_`]*\s*[.:]\s*(.+)$",
+            joined,
+            re.I | re.S,
+        )
+        if labelled_reason:
+            label = labelled_reason.group(1).capitalize()
+            reason = labelled_reason.group(2).strip()
+            if reason:
+                reason = reason[0].lower() + reason[1:]
+            answer = f"{label} — {reason}"
     if category == "logic" and not re.search(r"\b(explain|show|justify|why)\b", prompt, re.I):
         yes_no = re.match(r"^[^A-Za-z]*(yes|no)\b", answer, re.I)
         if yes_no:
@@ -408,6 +509,12 @@ def validate_model_answer(answer: str, category: str, prompt: str) -> None:
         )
         if allowed_labels and returned_label and returned_label.group(1).lower() not in allowed_labels:
             raise FireworksError("model returned a sentiment label outside the allowed set", status_code=502)
+        if re.search(r"\b(?:reason|reasoning|justify|explain)\b", instruction, re.I):
+            if len(re.findall(r"\b[\w'-]+\b", answer)) < 8:
+                raise FireworksError("model omitted the requested sentiment reason", status_code=502)
+            if re.search(r"\b(?:exactly\s+)?one[- ]sentence\b", instruction, re.I):
+                if _sentence_count(answer) != 1:
+                    raise FireworksError("model violated one-sentence sentiment format", status_code=502)
 
     if category == "summarization":
         bullet_request = re.search(
@@ -427,6 +534,21 @@ def validate_model_answer(answer: str, category: str, prompt: str) -> None:
                     f"model returned {len(bullets)} bullets; expected {expected}",
                     status_code=502,
                 )
+            per_bullet_limit = re.search(
+                r"\beach\s+(?:bullet(?:\s+point)?\s+)?(?:no\s+longer\s+than|"
+                r"no\s+more\s+than|at\s+most)\s+(\d+)\s+words?\b",
+                prompt,
+                re.I,
+            )
+            if per_bullet_limit is not None:
+                limit = int(per_bullet_limit.group(1))
+                for bullet in bullets:
+                    content = re.sub(r"^\s*(?:[-*â€¢]|\d+[.)])\s+", "", bullet)
+                    if len(re.findall(r"\b[\w'-]+\b", content)) > limit:
+                        raise FireworksError(
+                            f"model exceeded {limit}-word per-bullet limit",
+                            status_code=502,
+                        )
         word_limit = re.search(
             r"\b(?:no\s+more\s+than|at\s+most|maximum\s+of)\s+(\d+)\s+words?\b",
             prompt,
