@@ -57,18 +57,29 @@ class LocalSolverTests(unittest.TestCase):
 
     def test_standard_concept_comparisons_use_local_only_when_complete(self) -> None:
         cases = {
+            "What is the difference between CPU and GPU? Briefly explain what each is best suited for.": "parallel",
             (
                 "Compare CPUs and GPUs. Explain how their core architecture and parallelism differ, "
                 "and identify the workloads each is best suited for."
             ): "sequential",
             (
+                "Explain the difference between supervised and unsupervised machine learning. "
+                "Give one example of each."
+            ): "clustering",
+            (
                 "What is the difference between supervised and unsupervised machine learning? "
                 "Explain the training data, goal, and one typical task for each."
             ): "labeled",
+            "Explain the difference between RAM and ROM in a computer. What is each type used for?": "non-volatile",
             (
                 "Compare RAM and ROM by volatility, speed, and what each is used for in a computer."
             ): "firmware",
             "What is the difference between HTTP and HTTPS? Explain TLS encryption and web security.": "TLS",
+            "What is the difference between HTTP and HTTPS? Why is HTTPS important for web security?": "integrity",
+            (
+                "What is the difference between machine learning and deep learning? Briefly explain "
+                "how each works."
+            ): "automatically",
             (
                 "What is the difference between machine learning and deep learning? Explain feature "
                 "engineering and neural networks."
@@ -814,13 +825,19 @@ class LocalSolverTests(unittest.TestCase):
         summary_prompt = "Summarize in one sentence: The release is stable and fast."
         client.responses[summary_prompt] = "The release is stable and fast."
         safe_summary = solve_prompt(summary_prompt, client=client)
-        self.assertEqual(safe_summary.source, "fireworks")
+        self.assertEqual(safe_summary.source, "local:already_one_sentence")
         self.assertEqual(safe_summary.answer, "The release is stable and fast.")
 
         complex_summary = "Summarize this report in one sentence: Revenue increased. Costs fell. Risks remain."
         client.responses[complex_summary] = "Revenue increased and costs fell, though risks remain."
         solved_summary = solve_prompt(complex_summary, client=client)
         self.assertEqual(solved_summary.source, "fireworks")
+
+        ambiguous_ner = (
+            "Extract all named entities and types from: Apple CEO Tim Cook spoke in California."
+        )
+        client.responses[ambiguous_ner] = "Apple ORG; Tim Cook PERSON; California LOCATION"
+        self.assertEqual(solve_prompt(ambiguous_ner, client=client).source, "fireworks")
 
         local_math = solve_prompt("What is 7 * (8 + 2)?", client=client)
         self.assertEqual(local_math.source, "local:safe_eval")

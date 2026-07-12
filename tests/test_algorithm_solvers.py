@@ -7,8 +7,10 @@ import unittest
 
 from app.agent import solve_prompt
 from eval.run_local_eval import FakeFireworksClient, _answer_matches
+from solvers.code_debug_solver import solve_code_debug
 from solvers.code_generation_solver import solve_code_generation
 from solvers.factual_solver import solve_factual
+from solvers.logic_solver import solve_logic
 from solvers.math_solver import solve_math
 from solvers.sentiment_solver import solve_sentiment
 from solvers.summarization_solver import solve_summarization
@@ -71,6 +73,16 @@ class AlgorithmSolverTests(unittest.TestCase):
                 "Write a Python function count_vowels(text) that counts vowels in a string.",
                 "count_vowels", ("Fireworks",), 3,
             ),
+            (
+                "Write a Python function unique_words(text) that returns a set of lowercase words "
+                "from text, ignoring punctuation.",
+                "unique_words", ("Hello, HELLO world!",), {"hello", "world"},
+            ),
+            (
+                "Write a Python function merge_sorted(a, b) that returns one sorted list "
+                "containing the values from two already sorted lists.",
+                "merge_sorted", ([1, 4, 7], [2, 3, 9]), [1, 2, 3, 4, 7, 9],
+            ),
         )
         for prompt, name, args, expected in cases:
             with self.subTest(prompt=prompt):
@@ -89,6 +101,53 @@ class AlgorithmSolverTests(unittest.TestCase):
             solve_code_generation("Write a Python function that reverses a list in-place.")
         )
         self.assertIsNone(solve_code_generation("Write a Python function that computes an FFT."))
+
+    def test_remaining_audit_algorithms_are_local_and_executable(self) -> None:
+        factual_cases = {
+            "In one concise sentence, explain the difference between authentication and authorization.": (
+                "identity", "permission"
+            ),
+            "What do the ACID properties of a database transaction stand for?": (
+                "Atomicity", "Consistency", "Isolation", "Durability"
+            ),
+        }
+        for prompt, concepts in factual_cases.items():
+            with self.subTest(prompt=prompt):
+                solved = solve_prompt(prompt, client=FakeFireworksClient())
+                self.assertEqual(solved.source, "local:standard_factual_definition")
+                for concept in concepts:
+                    self.assertIn(concept.lower(), solved.answer.lower())
+
+        debug_prompt = (
+            "Fix this Python function so it returns the sum of all numbers, including the final item. "
+            "Return code only.\n```python\ndef total(values):\n    total = 0\n"
+            "    for i in range(len(values) - 1):\n        total += values[i]\n    return total\n```"
+        )
+        repaired = solve_code_debug(debug_prompt)
+        self.assertIsNotNone(repaired)
+        namespace: dict[str, object] = {}
+        exec(repaired.answer, namespace)  # noqa: S102 - deterministic repair only.
+        self.assertEqual(namespace["total"]([1, 2, 3]), 6)  # type: ignore[operator]
+
+        logic = solve_logic(
+            "If a report is approved, it is archived. This report is not archived. "
+            "Can it be approved? Answer Yes or No."
+        )
+        self.assertIsNotNone(logic)
+        self.assertEqual(logic.answer, "No")
+
+        sql_prompt = (
+            "Write an SQL query that returns the names of customers who have placed no orders. "
+            "Tables are customers(id, name) and orders(customer_id)."
+        )
+        sql = solve_code_generation(sql_prompt)
+        self.assertIsNotNone(sql)
+        with sqlite3.connect(":memory:") as connection:
+            connection.execute("CREATE TABLE customers (id INTEGER, name TEXT)")
+            connection.execute("CREATE TABLE orders (customer_id INTEGER)")
+            connection.executemany("INSERT INTO customers VALUES (?, ?)", [(1, "Ada"), (2, "Bo")])
+            connection.execute("INSERT INTO orders VALUES (2)")
+            self.assertEqual(connection.execute(sql.answer).fetchall(), [("Ada",)])
 
     def test_symbolic_single_step_equations_are_isolated_exactly(self) -> None:
         cases = {
@@ -155,13 +214,20 @@ class AlgorithmSolverTests(unittest.TestCase):
                 self.assertEqual(solved.answer, expected)
                 self.assertGreaterEqual(solved.confidence, 0.98)
 
-    def test_requested_sentiment_reason_forces_remote(self) -> None:
-        prompt = (
+    def test_requested_mixed_sentiment_reason_uses_verified_local_contrast(self) -> None:
+        prompts = (
             "Classify as Positive, Negative, or Neutral and give a one-sentence reason: "
-            "'Delivery was late, but support resolved the issue.'"
+            "'Delivery was late and the box was damaged, but the item worked perfectly "
+            "and support resolved the issue.'",
+            "Classify the sentiment as Positive, Negative, or Neutral and give a one-sentence "
+            "reason: 'The meal was delicious, but service was slow and the waiter was rude.'",
         )
-        client = FakeFireworksClient({prompt: "Neutral: It includes a problem and a positive resolution."})
-        self.assertEqual(solve_prompt(prompt, client=client).source, "fireworks")
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                solved = solve_prompt(prompt, client=FakeFireworksClient())
+                self.assertEqual(solved.source, "local:mixed_contrast_reason")
+                self.assertEqual(solved.tokens_used, 0)
+                self.assertEqual(sum(solved.answer.count(mark) for mark in ".!?"), 1)
 
     def test_short_unambiguous_sentiment_uses_strong_local_path(self) -> None:
         cases = {
@@ -189,6 +255,18 @@ class AlgorithmSolverTests(unittest.TestCase):
             with self.subTest(prompt=ambiguous):
                 routed = solve_prompt(ambiguous, client=FakeFireworksClient({ambiguous: "neutral"}))
                 self.assertEqual(routed.source, "fireworks")
+
+    def test_verified_pure_and_factual_sentiment_routes_locally(self) -> None:
+        cases = {
+            "Classify the sentiment: The service is unreliable and frustrating.": "negative",
+            "Classify as positive, negative, or neutral: The package arrived on Tuesday as scheduled.": "neutral",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                solved = solve_prompt(prompt, client=FakeFireworksClient())
+                self.assertEqual(solved.answer, expected)
+                self.assertEqual(solved.tokens_used, 0)
+                self.assertTrue(solved.source.startswith("local:"))
 
     def test_grouped_average_sql_executes(self) -> None:
         solved = solve_code_generation(
@@ -259,17 +337,14 @@ class AlgorithmSolverTests(unittest.TestCase):
                 self.assertIsNotNone(solved)
                 self.assertIn(solved.method, {"short_source_passthrough", "already_one_sentence"})
 
-    def test_fixture_routing_keeps_semantic_tasks_remote(self) -> None:
+    def test_fixture_routing_keeps_unverifiable_semantic_tasks_remote(self) -> None:
         fixture = json.loads(Path("eval/fixtures/held_out.json").read_text(encoding="utf-8"))
         responses = {str(item["prompt"]): str(item.get("fake_answer", "ok")) for item in fixture}
         client = FakeFireworksClient(responses)
         for item in fixture:
             solve_prompt(str(item["prompt"]), client=client)
-        self.assertEqual(len(client.calls), 7)
-        self.assertTrue(
-            {"sentiment", "summarization", "ner"}
-            <= {call["category"] for call in client.calls}
-        )
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(client.calls[0]["category"], "factual_qa")
 
 
 if __name__ == "__main__":

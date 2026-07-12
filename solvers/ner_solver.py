@@ -112,6 +112,17 @@ DATE_RELATIVES = {
     "this",
 }
 
+AMBIGUOUS_ROLE_WORDS = {
+    "CEO",
+    "CFO",
+    "CTO",
+    "Director",
+    "Founder",
+    "Governor",
+    "Minister",
+    "Secretary",
+}
+
 LOCATION_PREPOSITIONS = {
     "across",
     "at",
@@ -197,7 +208,9 @@ def solve_ner(prompt: str) -> LocalAnswer | None:
     entities, unresolved = _extract_entities(text)
     if not entities:
         return None
-    confidence = 0.78 if unresolved else 0.9
+    role_words = "|".join(sorted(AMBIGUOUS_ROLE_WORDS, key=len, reverse=True))
+    has_ambiguous_role = bool(re.search(fr"\b(?:{role_words})\b", text))
+    confidence = 0.78 if unresolved or has_ambiguous_role else 0.9
     return LocalAnswer(json.dumps(entities, ensure_ascii=False), confidence, "regex_entities")
 
 

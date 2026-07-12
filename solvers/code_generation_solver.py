@@ -9,12 +9,48 @@ from solvers.common import LocalAnswer
 def solve_code_generation(prompt: str) -> LocalAnswer | None:
     lower = prompt.lower()
     if "sql" in lower:
+        no_orders = _solve_customers_without_orders_sql(lower)
+        if no_orders:
+            return _answer(no_orders, "customers_without_orders_sql_generation", python=False)
         sql = _solve_grouped_average_sql(lower)
         return _answer(sql, "grouped_average_sql_generation", python=False) if sql else None
     if re.search(r"\b(?:javascript|typescript|java|c\+\+|rust)\b", lower):
         return None
 
     signature = _requested_signature(prompt)
+    if re.search(r"\bunique[_ ]words\b", lower) and re.search(
+        r"\blowercase\b", lower
+    ) and re.search(r"\b(?:ignore|ignoring|remove)\w*\s+punctuation\b", lower):
+        name, parameter = signature or ("unique_words", "text")
+        return _answer(
+            "import re\n\n"
+            f"def {name}({parameter}):\n"
+            f"    return set(re.findall(r\"[a-z0-9']+\", {parameter}.lower()))",
+            "unique_words_generation",
+        )
+    merge_signature = re.search(
+        r"\b(?:function|def)\s+([A-Za-z_]\w*)\s*\(\s*([A-Za-z_]\w*)\s*,\s*([A-Za-z_]\w*)\s*\)",
+        prompt,
+        re.I,
+    )
+    if merge_signature and re.search(r"\bmerge[_ ]sorted\b", lower) and re.search(
+        r"\b(?:two|2)\s+(?:already\s+)?sorted\s+lists?\b", lower
+    ):
+        name, first, second = merge_signature.groups()
+        return _answer(
+            f"def {name}({first}, {second}):\n"
+            "    merged = []\n"
+            "    i = j = 0\n"
+            f"    while i < len({first}) and j < len({second}):\n"
+            f"        if {first}[i] <= {second}[j]:\n"
+            f"            merged.append({first}[i])\n"
+            "            i += 1\n"
+            "        else:\n"
+            f"            merged.append({second}[j])\n"
+            "            j += 1\n"
+            f"    return merged + {first}[i:] + {second}[j:]",
+            "merge_sorted_generation",
+        )
     if re.search(r"\bsquare\b", lower) and re.search(
         r"\b(?:multipl(?:y|ied)\s+by|times)\s+(?:itself|the\s+number)\b|\bn\s*\*\s*n\b",
         lower,
@@ -155,6 +191,23 @@ def _solve_grouped_average_sql(lower: str) -> str | None:
     return (
         f"SELECT {group}, AVG({metric}) AS {alias}\nFROM {table}\n"
         f"GROUP BY {group}\nORDER BY {alias} {direction};"
+    )
+
+
+def _solve_customers_without_orders_sql(lower: str) -> str | None:
+    if not (
+        re.search(r"\bcustomers?\b", lower)
+        and re.search(r"\borders?\b", lower)
+        and re.search(r"\b(?:no|without|never)\s+orders?\b|\bplaced\s+no\s+orders?\b", lower)
+        and re.search(r"customers\s*\(\s*id\s*,\s*name\s*\)", lower)
+        and re.search(r"orders\s*\(\s*customer_id\s*\)", lower)
+    ):
+        return None
+    return (
+        "SELECT c.name\nFROM customers AS c\n"
+        "WHERE NOT EXISTS (\n"
+        "    SELECT 1 FROM orders AS o WHERE o.customer_id = c.id\n"
+        ");"
     )
 
 

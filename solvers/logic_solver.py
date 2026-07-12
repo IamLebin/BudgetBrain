@@ -8,6 +8,9 @@ from solvers.common import LocalAnswer
 
 def solve_logic(prompt: str) -> LocalAnswer | None:
     lower = prompt.lower()
+    pronoun_contrapositive = _solve_pronoun_contrapositive(prompt)
+    if pronoun_contrapositive is not None:
+        return pronoun_contrapositive
     xor = _solve_exactly_one_truth(prompt, lower)
     if xor is not None:
         return xor
@@ -24,6 +27,19 @@ def solve_logic(prompt: str) -> LocalAnswer | None:
     if universal is not None:
         return universal
     return None
+
+
+def _solve_pronoun_contrapositive(prompt: str) -> LocalAnswer | None:
+    pattern = re.compile(
+        r"\bif\s+(?:a|an|the)\s+(?P<entity>[a-z][a-z -]*?)\s+is\s+"
+        r"(?P<antecedent>[a-z][a-z -]*?)\s*,\s*it\s+is\s+"
+        r"(?P<consequent>[a-z][a-z -]*?)\.\s*this\s+(?P=entity)\s+is\s+not\s+"
+        r"(?P=consequent)\.\s*can\s+it\s+be\s+(?P=antecedent)\?",
+        re.I,
+    )
+    if pattern.search(prompt) is None:
+        return None
+    return LocalAnswer("No", 0.99, "pronoun_modus_tollens")
 
 
 def _solve_unique_ordering(prompt: str) -> LocalAnswer | None:
