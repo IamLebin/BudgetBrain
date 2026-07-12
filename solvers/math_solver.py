@@ -29,6 +29,26 @@ def solve_math(prompt: str) -> LocalAnswer | None:
     if inventory is not None:
         return inventory
 
+    recipe = _solve_recipe_scaling(cleaned)
+    if recipe is not None:
+        return recipe
+
+    for deterministic_solver in (
+        _solve_percentage_remainder,
+        _solve_total_distance,
+        _solve_discount_then_tax,
+        _solve_team_days,
+        _solve_periodic_doubling,
+        _solve_rectangle_dimensions,
+        _solve_compound_investment,
+        _solve_fraction_remaining,
+        _solve_linear_rental_cost,
+        _solve_volume_cups,
+    ):
+        deterministic = deterministic_solver(cleaned)
+        if deterministic is not None:
+            return deterministic
+
     sequential_percent = _solve_sequential_percent_changes(cleaned)
     if sequential_percent is not None:
         return sequential_percent
@@ -78,7 +98,7 @@ def solve_math(prompt: str) -> LocalAnswer | None:
         return None
     try:
         value = _safe_eval(expression)
-    except (ValueError, ZeroDivisionError, OverflowError):
+    except (SyntaxError, ValueError, ZeroDivisionError, OverflowError):
         return None
     return LocalAnswer(_format_number(value), 0.95, "safe_eval")
 
@@ -98,7 +118,7 @@ def _solve_inventory_changes(text: str) -> LocalAnswer | None:
     number = r"(-?\d+(?:\.\d+)?)"
     initial_match = re.search(
         fr"\b(?:has|starts? with|begins? with|initially has)\s+{number}\s+"
-        r"(?:items?|units?|products?|tickets?|books?|dollars?|people|employees)\b",
+        r"(?:items?|units?|parts?|products?|tickets?|books?|dollars?|people|employees)\b",
         text,
         flags=re.IGNORECASE,
     )
@@ -107,7 +127,7 @@ def _solve_inventory_changes(text: str) -> LocalAnswer | None:
 
     initial = Fraction(initial_match.group(1))
     percent_match = re.search(
-        fr"\b(?:sells?|sold|uses?|used|loses?|lost|spends?|spent|removes?|removed)\s+"
+        fr"\b(?:sells?|sold|ships?|shipped|uses?|used|loses?|lost|spends?|spent|removes?|removed)\s+"
         fr"{number}\s*(?:%|percent\b)",
         text,
         flags=re.IGNORECASE,
@@ -119,27 +139,192 @@ def _solve_inventory_changes(text: str) -> LocalAnswer | None:
     tail = text[percent_match.end() :]
     if re.search(r"-?\d+(?:\.\d+)?\s*(?:%|percent\b)", tail, re.I):
         return None
-    subtract_match = re.search(
-        fr"\b(?:and|then)\s+(?:(?:it|they|the store)\s+)?"
-        fr"(?:(?:sells?|sold|uses?|used|loses?|lost|spends?|spent|removes?|removed)\s+)?"
-        fr"(?:another|an additional)?\s*{number}(?:\s+more)?\b",
-        tail,
+    operation_tail = re.sub(r"\bQ[1-4]\b", "", tail, flags=re.I)
+    operation_tail = re.sub(
+        fr"\b(?:and|then)\s+({number})\s+more\b",
+        r"sells \1",
+        operation_tail,
+        flags=re.I,
+    )
+    operation_pattern = re.compile(
+        fr"\b(?P<verb>sells?|sold|ships?|shipped|uses?|used|loses?|lost|spends?|spent|removes?|removed|"
+        fr"receives?|received|adds?|added|buys?|bought|gains?|gained|restocks?|restocked)\s+"
+        fr"(?:another|an\s+additional)?\s*(?P<value>{number})(?:\s+more)?\b",
         flags=re.IGNORECASE,
     )
-    if subtract_match:
-        remaining -= Fraction(subtract_match.group(1))
-
-    add_match = re.search(
-        fr"\b(?:and|then)\s+(?:(?:it|they|the store)\s+)?"
-        fr"(?:receives?|received|adds?|added|buys?|bought|gains?|gained)\s+"
-        fr"(?:another|an additional)?\s*{number}\b",
-        tail,
-        flags=re.IGNORECASE,
+    operations = list(operation_pattern.finditer(operation_tail))
+    value_spans = [operation.span("value") for operation in operations]
+    for extra in re.finditer(r"-?\d+(?:\.\d+)?", operation_tail):
+        if not any(extra.start() >= start and extra.end() <= end for start, end in value_spans):
+            return None
+    subtract_verbs = (
+        "sell", "sold", "ship", "shipped", "use", "used", "lose", "lost", "spend", "spent", "remove"
     )
-    if add_match:
-        remaining += Fraction(add_match.group(1))
+    for operation in operations:
+        value = Fraction(operation.group("value"))
+        verb = operation.group("verb").lower()
+        remaining = remaining - value if verb.startswith(subtract_verbs) else remaining + value
 
     return LocalAnswer(_format_number(remaining), 0.98, "inventory_percent_changes")
+
+
+def _solve_recipe_scaling(text: str) -> LocalAnswer | None:
+    amount = re.search(
+        r"\brequires?\s+(?P<amount>\d+\s*/\s*\d+|\d+(?:\.\d+)?)\s+cups?\b"
+        r".{0,50}?\bfor\s+(?P<base>\d+)\s+(?P<item>[A-Za-z]+)\b",
+        text,
+        re.I,
+    )
+    if amount is None:
+        return None
+    target = re.search(
+        fr"\b(?:for|needed\s+for)\s+(?P<target>\d+)\s+{re.escape(amount.group('item'))}\b",
+        text[amount.end() :],
+        re.I,
+    )
+    price = re.search(r"\bcosts?\s+\$?(?P<price>\d+(?:\.\d+)?)\s+per\s+cup\b", text, re.I)
+    if target is None or price is None or text.count("?") < 2:
+        return None
+    amount_text = amount.group("amount").replace(" ", "")
+    base_amount = (
+        Fraction(*map(int, amount_text.split("/")))
+        if "/" in amount_text
+        else Fraction(amount_text)
+    )
+    scaled = base_amount * Fraction(int(target.group("target")), int(amount.group("base")))
+    cost = scaled * Fraction(price.group("price"))
+    return LocalAnswer(
+        f"{_format_number(scaled)} cups; ${float(cost):.2f}",
+        0.99,
+        "recipe_scaling",
+    )
+
+
+def _solve_percentage_remainder(text: str) -> LocalAnswer | None:
+    total = re.search(r"\b(?:has|contains|employs)\s+(\d+(?:\.\d+)?)\s+(?:employees|people|items|units)\b", text, re.I)
+    if total is None or not re.search(r"\b(?:the\s+)?rest\s+(?:are|is|in|goes?)\b", text, re.I):
+        return None
+    percentages = [Fraction(value) for value in re.findall(r"(\d+(?:\.\d+)?)\s*%", text)]
+    if len(percentages) < 2 or any(value < 0 for value in percentages) or sum(percentages) > 100:
+        return None
+    remainder = Fraction(total.group(1)) * (1 - sum(percentages) / 100)
+    return LocalAnswer(_format_number(remainder), 0.99, "percentage_remainder")
+
+
+def _solve_total_distance(text: str) -> LocalAnswer | None:
+    if not re.search(r"\btotal\s+distance\b", text, re.I):
+        return None
+    legs = re.findall(
+        r"(?:at\s+)?(\d+(?:\.\d+)?)\s*(km/h|kph|mph)\s+for\s+"
+        r"(\d+(?:\.\d+)?)\s*hours?\b",
+        text,
+        re.I,
+    )
+    if len(legs) < 2 or len({unit.lower() for _, unit, _ in legs}) != 1:
+        return None
+    distance = sum(Fraction(speed) * Fraction(hours) for speed, _, hours in legs)
+    unit = "km" if legs[0][1].lower() in {"km/h", "kph"} else "miles"
+    return LocalAnswer(f"{_format_number(distance)} {unit}", 0.99, "total_distance")
+
+
+def _solve_discount_then_tax(text: str) -> LocalAnswer | None:
+    original = re.search(r"\boriginally\s+priced\s+at\s+\$?(\d+(?:\.\d+)?)\b", text, re.I)
+    discount = re.search(r"(\d+(?:\.\d+)?)\s*%\s+discount\b", text, re.I)
+    tax = re.search(r"(?:sales\s+)?tax\s+of\s+(\d+(?:\.\d+)?)\s*%", text, re.I)
+    if original is None or discount is None or tax is None:
+        return None
+    value = Fraction(original.group(1)) * (1 - Fraction(discount.group(1)) / 100)
+    value *= 1 + Fraction(tax.group(1)) / 100
+    return LocalAnswer(f"${float(value):.2f}", 0.99, "discount_then_tax")
+
+
+def _solve_team_days(text: str) -> LocalAnswer | None:
+    total = re.search(r"\brequires?\s+(\d+(?:\.\d+)?)\s+hours?\s+of\s+work\b", text, re.I)
+    schedule = re.search(
+        r"\b(\d+)\s+people\s+work\s+on\s+it\s+for\s+(\d+(?:\.\d+)?)\s+hours?\s+per\s+day\b",
+        text,
+        re.I,
+    )
+    if total is None or schedule is None:
+        return None
+    daily = Fraction(schedule.group(1)) * Fraction(schedule.group(2))
+    if daily <= 0:
+        return None
+    return LocalAnswer(f"{_format_number(Fraction(total.group(1)) / daily)} days", 0.99, "team_days")
+
+
+def _solve_periodic_doubling(text: str) -> LocalAnswer | None:
+    interval = re.search(r"\bdoubles?\s+every\s+(\d+)\s+hours?\b", text, re.I)
+    initial = re.search(r"\bstarts?\s+with\s+(\d+)\b", text, re.I)
+    elapsed = re.search(r"\bafter\s+(\d+)\s+hours?\b", text, re.I)
+    if interval is None or initial is None or elapsed is None:
+        return None
+    interval_hours, elapsed_hours = int(interval.group(1)), int(elapsed.group(1))
+    if interval_hours <= 0 or elapsed_hours % interval_hours:
+        return None
+    value = int(initial.group(1)) * 2 ** (elapsed_hours // interval_hours)
+    return LocalAnswer(str(value), 0.99, "periodic_doubling")
+
+
+def _solve_rectangle_dimensions(text: str) -> LocalAnswer | None:
+    perimeter = re.search(r"\bperimeter\s+of\s+(\d+(?:\.\d+)?)\s*(meters?|metres?|m)\b", text, re.I)
+    if perimeter is None or not re.search(r"\blength\s+(?:that\s+)?is\s+twice\s+(?:its\s+|the\s+)?width\b", text, re.I):
+        return None
+    width = Fraction(perimeter.group(1)) / 6
+    length = width * 2
+    return LocalAnswer(
+        f"Length {_format_number(length)} m; Width {_format_number(width)} m",
+        0.99,
+        "rectangle_dimensions",
+    )
+
+
+def _solve_compound_investment(text: str) -> LocalAnswer | None:
+    principal = re.search(r"\binvestment\s+of\s+\$?(\d+(?:\.\d+)?)\b", text, re.I)
+    rate = re.search(r"\b(?:grows?|interest)\s+(?:at|of)\s+(\d+(?:\.\d+)?)\s*%", text, re.I)
+    years = re.search(r"\bafter\s+(\d+)\s+years?\b", text, re.I)
+    if principal is None or rate is None or years is None or "compound" not in text.lower():
+        return None
+    value = Fraction(principal.group(1)) * (1 + Fraction(rate.group(1)) / 100) ** int(years.group(1))
+    return LocalAnswer(f"${float(value):.2f}", 0.99, "compound_investment")
+
+
+def _solve_fraction_remaining(text: str) -> LocalAnswer | None:
+    if not re.search(r"\b(?:fraction|portion)\b.{0,30}\b(?:left|remain)", text, re.I):
+        return None
+    fractions = re.findall(r"\b(\d+)\s*/\s*(\d+)\b", text)
+    if len(fractions) != 2:
+        return None
+    remaining = Fraction(1) - sum(Fraction(int(a), int(b)) for a, b in fractions)
+    if remaining < 0:
+        return None
+    return LocalAnswer(f"{remaining.numerator}/{remaining.denominator}", 0.99, "fraction_remaining")
+
+
+def _solve_linear_rental_cost(text: str) -> LocalAnswer | None:
+    rates = re.search(
+        r"\bcharges?\s+\$?(\d+(?:\.\d+)?)\s+per\s+day\s+plus\s+"
+        r"\$?(\d+(?:\.\d+)?)\s+per\s+mile",
+        text,
+        re.I,
+    )
+    usage = re.search(r"\b(?:rents?|rented)\s+for\s+(\d+)\s+days?\s+and\s+drives?\s+(\d+(?:\.\d+)?)\s+miles?", text, re.I)
+    if rates is None or usage is None:
+        return None
+    cost = Fraction(rates.group(1)) * int(usage.group(1)) + Fraction(rates.group(2)) * Fraction(usage.group(2))
+    return LocalAnswer(f"${float(cost):.2f}", 0.99, "linear_rental_cost")
+
+
+def _solve_volume_cups(text: str) -> LocalAnswer | None:
+    volume = re.search(r"\bholds?\s+(\d+(?:\.\d+)?)\s+lit(?:ers?|res?)\b", text, re.I)
+    cup = re.search(r"\b(\d+(?:\.\d+)?)\s*[- ]?millilit(?:er|re)\s+cups?\b", text, re.I)
+    if volume is None or cup is None or not re.search(r"\bhow\s+many\b", text, re.I):
+        return None
+    cup_ml = Fraction(cup.group(1))
+    if cup_ml <= 0:
+        return None
+    count = Fraction(volume.group(1)) * 1000 / cup_ml
+    return LocalAnswer(f"{_format_number(count)} cups", 0.99, "volume_cups")
 
 
 def _solve_sequential_percent_changes(text: str) -> LocalAnswer | None:
@@ -510,6 +695,8 @@ def _solve_simple_word_arithmetic(text: str) -> LocalAnswer | None:
 
 
 def _extract_expression(text: str) -> str | None:
+    if text.count("?") > 1:
+        return None
     code_match = re.search(r"`([^`]+)`", text)
     if code_match:
         candidate = code_match.group(1)

@@ -112,7 +112,8 @@ NEGATION_BOUNDARIES = {".", "!", "?", ";", ",", "but", "however", "although", "y
 
 
 def solve_sentiment(prompt: str) -> LocalAnswer | None:
-    if re.search(r"\b(justify|explain|give (?:a )?reason|why)\b", prompt, re.I):
+    instruction = prompt.split(":", maxsplit=1)[0]
+    if re.search(r"\b(justify|explain|reason|why)\b", instruction, re.I):
         return None
 
     text = _strip_instruction(prompt)

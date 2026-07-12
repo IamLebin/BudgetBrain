@@ -1,0 +1,91 @@
+[
+  {
+    "task_id": "T01",
+    "category": "factual_qa",
+    "prompt": "Name the three primary colors in the RGB color model and briefly explain why displays use RGB instead of RYB.",
+    "fake_answer": "Red, green, and blue are RGB primaries; displays emit light and mix these colors additively, while RYB describes subtractive mixing of physical pigments.",
+    "contains": ["red", "green", "blue", "additive", "light", "RYB", "subtractive", "pigment"]
+  },
+  {
+    "task_id": "T01b",
+    "category": "factual_qa",
+    "prompt": "What is the difference between machine learning and deep learning? Briefly explain how each works.",
+    "fake_answer": "Machine learning uses algorithms and often manual feature engineering to learn patterns from data; deep learning is its subset using multilayer neural networks that automatically learn features from raw data.",
+    "contains": ["machine learning", "deep learning", "subset", "neural", "manual feature", "automatic", "raw data"]
+  },
+  {
+    "task_id": "T01c",
+    "category": "factual_qa",
+    "prompt": "Explain the difference between RAM and ROM in a computer. What is each type used for?",
+    "fake_answer": "RAM is fast, volatile working memory for active programs and data; ROM is slower, non-volatile memory that stores persistent firmware or BIOS.",
+    "contains": ["RAM", "ROM", "volatile", "non-volatile", "fast", "slower", "active", "firmware"]
+  },
+  {
+    "task_id": "T02",
+    "category": "math",
+    "prompt": "A warehouse starts with 2,400 units. In Q1 it sells 37% of stock. In Q2 it restocks 800 units. In Q3 it sells 640 units. How many units remain at the end of Q3?",
+    "expected": "1672"
+  },
+  {
+    "task_id": "T02b",
+    "category": "math",
+    "prompt": "A recipe requires 3/4 cup of sugar for 12 cookies. How much sugar is needed for 30 cookies? If sugar costs $2.40 per cup, what is the total cost of sugar for 30 cookies?",
+    "fake_answer": "30 cookies need 1.875 cups of sugar, costing $4.50.",
+    "contains": ["1.875", "4.50"]
+  },
+  {
+    "task_id": "T03",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment of this customer review as Positive, Negative, or Neutral and give a one-sentence reason: 'The product arrived two days late and the packaging was damaged, but the item worked perfectly and customer support resolved my complaint within an hour.'",
+    "fake_answer": "Mixed: The late, damaged delivery was negative, but the working item and fast support resolution made the outcome positive.",
+    "contains": ["late", "damaged", "work", "resolution"],
+    "contains_any": ["mixed", "neutral", "positive"],
+    "allowed_labels": ["Mixed", "Neutral", "Positive"],
+    "exact_sentences": 1
+  },
+  {
+    "task_id": "T03b",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment of this tweet as Positive, Negative, or Neutral and give a one-sentence reason: 'Just got my order. Box was dented and the manual was missing, but honestly the device itself is flawless and set up in under 5 minutes.'",
+    "fake_answer": "Mixed: The dented box and missing manual were negative, while the flawless device and quick setup were positive.",
+    "contains": ["dented", "missing", "flawless"],
+    "contains_any_groups": [["set up", "setup", "setting up"]],
+    "contains_any": ["mixed", "neutral", "positive"],
+    "allowed_labels": ["Mixed", "Neutral", "Positive"],
+    "exact_sentences": 1
+  },
+  {
+    "task_id": "T04",
+    "category": "summarization",
+    "prompt": "Summarize the following passage in exactly two sentences:\n\n'Machine learning is increasingly deployed in healthcare for diagnosis, treatment planning, and patient monitoring. These systems analyse medical images, predict patient deterioration, and spot patterns in electronic health records that might be missed by human clinicians. However, concerns remain about model interpretability, data privacy, liability when errors occur, and the potential for algorithmic bias to worsen existing healthcare disparities. Regulatory frameworks are still catching up with the pace of deployment, creating uncertainty for healthcare providers and technology developers alike.'",
+    "fake_answer": "Machine learning supports healthcare diagnosis by analysing images, predicting deterioration, and finding patterns in health records. Its deployment raises interpretability, privacy, liability, bias, and regulatory concerns.",
+    "contains": ["healthcare", "diagnosis", "predict", "records", "interpretability", "privacy", "liability", "bias", "regulatory"],
+    "contains_any_groups": [["image", "images"]],
+    "exact_sentences": 2
+  },
+  {
+    "task_id": "T04b",
+    "category": "summarization",
+    "prompt": "Summarize the following passage in exactly three bullet points, each no longer than 15 words:\n\n'Remote work has transformed how companies operate globally. Employees gain flexibility and reduced commute times, leading to reported improvements in work-life balance. However, challenges persist around collaboration, company culture, and the blurring of personal and professional boundaries. Organisations are responding by investing in digital collaboration tools and rethinking office space as a hub for social and creative work rather than daily attendance.'",
+    "fake_answer": "- Remote work improves flexibility, commutes, and work-life balance.\n- Collaboration, culture, and personal-work boundaries remain difficult.\n- Organisations invest in digital tools and redesign offices for social and creative work.",
+    "contains": ["flexibility", "work-life", "collaboration", "culture", "digital", "office"],
+    "contains_any_groups": [["boundary", "boundaries"]],
+    "exact_bullets": 3,
+    "max_words_per_bullet": 15
+  },
+  {
+    "task_id": "T05",
+    "category": "ner",
+    "prompt": "Extract all named entities from the following text and label each as PERSON, ORGANIZATION, LOCATION, or DATE:\n\n'On March 15 2023, Sundar Pichai announced that Google would open a new AI research lab in Zurich, partnering with ETH Zurich to focus on large language model safety.'",
+    "fake_answer": "March 15 2023 DATE; Sundar Pichai PERSON; Google ORGANIZATION; Zurich LOCATION; ETH Zurich ORGANIZATION",
+    "contains": ["March 15 2023", "Sundar Pichai", "Google", "Zurich", "ETH Zurich"],
+    "entity_labels": [
+      {"text": "March 15 2023", "label": "DATE"},
+      {"text": "Sundar Pichai", "label": "PERSON"},
+      {"text": "Google", "label": "ORGANIZATION"},
+      {"text": "Zurich", "label": "LOCATION"},
+      {"text": "ETH Zurich", "label": "ORGANIZATION"}
+    ],
+    "exact_entity_count": 5
+  }
+]

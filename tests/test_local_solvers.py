@@ -492,6 +492,27 @@ class LocalSolverTests(unittest.TestCase):
         self.assertEqual(client.pick_model("factual_qa"), "kimi-k2p7-code")
         self.assertEqual(client.pick_model("summarization"), "kimi-k2p7-code")
         self.assertEqual(client.pick_model("sentiment"), "kimi-k2p7-code")
+        self.assertEqual(
+            client.candidate_models_for_prompt(
+                "factual_qa",
+                "What is the difference between machine learning and deep learning?",
+            )[0],
+            "minimax-m3",
+        )
+        self.assertEqual(
+            client.candidate_models_for_prompt(
+                "summarization",
+                "Summarize in exactly three bullet points: text",
+            )[0],
+            "minimax-m3",
+        )
+        self.assertEqual(
+            client.candidate_models_for_prompt(
+                "sentiment",
+                "Classify as Positive or Negative and give one sentence of reasoning: text",
+            )[0],
+            "minimax-m3",
+        )
 
     def test_fireworks_model_selection_avoids_gemma_by_default(self) -> None:
         client = FireworksClient(
@@ -555,7 +576,23 @@ class LocalSolverTests(unittest.TestCase):
                 "Ada: PERSON\nAcme: ORGANIZATION\nParis: GPE",
                 "ner",
             ),
-            "Ada: PERSON\nAcme: ORG\nParis: LOCATION",
+            "Ada: PERSON\nAcme: ORGANIZATION\nParis: LOCATION",
+        )
+        self.assertEqual(
+            clean_model_answer(
+                "Google: ORG\nZurich: GPE",
+                "ner",
+                "Label each as PERSON, ORGANIZATION, LOCATION, or DATE: text",
+            ),
+            "Google: ORGANIZATION\nZurich: LOCATION",
+        )
+        self.assertEqual(
+            clean_model_answer(
+                "World Health Organization - ORG",
+                "ner",
+                "Label as PERSON, ORGANIZATION, LOCATION, or DATE: text",
+            ),
+            "World Health Organization - ORGANIZATION",
         )
 
     def test_short_classification_answers_are_normalized(self) -> None:
@@ -596,6 +633,14 @@ class LocalSolverTests(unittest.TestCase):
             "Positive because it is reliable.",
         )
         self.assertEqual(
+            clean_model_answer(
+                "Negative. The update deleted settings and crashes repeatedly.",
+                "sentiment",
+                "Classify and give exactly one sentence of reasoning: text",
+            ),
+            "Negative — the update deleted settings and crashes repeatedly.",
+        )
+        self.assertEqual(
             normalize_model_id("accounts/fireworks/models/minimax-m3"),
             "accounts/fireworks/models/minimax-m3",
         )
@@ -622,6 +667,19 @@ class LocalSolverTests(unittest.TestCase):
                 "Only one line.",
                 "summarization",
                 "Summarize in two bullet points: text",
+            )
+        with self.assertRaisesRegex(FireworksError, "per-bullet limit"):
+            validate_model_answer(
+                "- This bullet contains far too many words for the strict limit requested here.\n"
+                "- Short second bullet.",
+                "summarization",
+                "Summarize in exactly two bullet points, each no longer than 8 words: text",
+            )
+        with self.assertRaisesRegex(FireworksError, "omitted.*sentiment reason"):
+            validate_model_answer(
+                "positive",
+                "sentiment",
+                "Classify and give exactly one sentence of reasoning: Great product.",
             )
 
     def test_code_debug_validation_requires_diagnosis_and_valid_fix(self) -> None:
@@ -679,7 +737,7 @@ class LocalSolverTests(unittest.TestCase):
         self.assertEqual(solved.source, "fireworks")
         self.assertEqual(solved.answer, "Tokyo")
 
-    def test_accuracy_first_uses_only_verified_semantic_shortcuts(self) -> None:
+    def test_accuracy_first_keeps_semantic_categories_remote(self) -> None:
         prompts = {
             "Extract named entities from: Maya Chen visited Paris.": "Maya Chen PERSON Paris LOCATION",
             "This Python function has a bug: def top(xs): return xs[0]. Fix it.": "def top(xs):\n    return max(xs)",
@@ -691,19 +749,20 @@ class LocalSolverTests(unittest.TestCase):
                 self.assertEqual(solved.source, "fireworks")
                 self.assertEqual(solved.answer, expected)
 
-        safe_sentiment = solve_prompt('Classify the sentiment: "This is excellent."', client=client)
-        self.assertEqual(safe_sentiment.source, "local:strong_single_lexicon")
+        sentiment_prompt = 'Classify the sentiment: "This is excellent."'
+        client.responses[sentiment_prompt] = "positive"
+        safe_sentiment = solve_prompt(sentiment_prompt, client=client)
+        self.assertEqual(safe_sentiment.source, "fireworks")
         self.assertEqual(safe_sentiment.answer, "positive")
 
         ambiguous_sentiment = 'Classify the sentiment: "It might be good, but the result is unclear."'
         client.responses[ambiguous_sentiment] = "neutral"
         self.assertEqual(solve_prompt(ambiguous_sentiment, client=client).source, "fireworks")
 
-        safe_summary = solve_prompt(
-            "Summarize in one sentence: The release is stable and fast.",
-            client=client,
-        )
-        self.assertEqual(safe_summary.source, "local:already_one_sentence")
+        summary_prompt = "Summarize in one sentence: The release is stable and fast."
+        client.responses[summary_prompt] = "The release is stable and fast."
+        safe_summary = solve_prompt(summary_prompt, client=client)
+        self.assertEqual(safe_summary.source, "fireworks")
         self.assertEqual(safe_summary.answer, "The release is stable and fast.")
 
         complex_summary = "Summarize this report in one sentence: Revenue increased. Costs fell. Risks remain."

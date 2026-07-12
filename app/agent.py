@@ -40,6 +40,10 @@ LOCAL_MIN_CONFIDENCE = {
     "logic": 0.97,
 }
 
+# Semantic interpretation is the dominant hidden-test failure mode. Keep these solvers as an
+# emergency fallback when Fireworks is unavailable, but never prefer them during scored runs.
+REMOTE_FIRST_CATEGORIES = {"sentiment", "summarization", "ner"}
+
 # Semantic categories remain remote-first except for narrow methods whose outputs are
 # structurally verifiable. The threshold is per method, not per broad category, so an unfamiliar
 # wording falls through to Fireworks instead of receiving a plausible local guess.
@@ -98,7 +102,7 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
     classification = classify_prompt(prompt)
     solver = LOCAL_SOLVERS.get(classification.category)
 
-    if solver is not None:
+    if solver is not None and classification.category not in REMOTE_FIRST_CATEGORIES:
         local = solver(prompt)
         if local is not None and _can_use_local(
             prompt,
@@ -143,7 +147,7 @@ def solve_prompt(prompt: str, client: FireworksClient | None = None) -> SolveRes
 def _can_use_local(prompt: str, category: str, method: str, confidence: float) -> bool:
     explanation_requested = re.search(
         r"\b(?:explain|explanation|justify|reasoning|derive|step[- ]by[- ]step|"
-        r"show\s+(?:your\s+)?(?:work|steps?))\b",
+        r"reason|show\s+(?:your\s+)?(?:work|steps?))\b",
         prompt,
         re.I,
     )
