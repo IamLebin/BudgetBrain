@@ -62,6 +62,22 @@ GEOGRAPHIC_NAMES = {
     "United States",
 }
 
+KNOWN_ORGANIZATIONS = {
+    "Amazon",
+    "Apple",
+    "Facebook",
+    "Fireworks",
+    "Google",
+    "IBM",
+    "Meta",
+    "Microsoft",
+    "NASA",
+    "NVIDIA",
+    "OpenAI",
+    "Oracle",
+    "Tesla",
+}
+
 LOCATION_SUFFIXES = {
     "Airport",
     "Bay",
@@ -191,6 +207,7 @@ MONTHS = {
 
 SKIP_CAPITALIZED = {
     "A",
+    "AI",
     "An",
     "Extract",
     "Find",
@@ -330,12 +347,21 @@ def _label_name(source: str, start: int, end: int, value: str) -> str | None:
     previous_word = previous[-1].lower() if previous else ""
     following = re.findall(r"\b[A-Za-z]+\b", source[end:])
     following_word = following[0].lower() if following else ""
-    if previous_word in LOCATION_PREPOSITIONS:
-        return "LOCATION"
+    if value in KNOWN_ORGANIZATIONS and _known_organization_context(
+        previous_word,
+        following_word,
+    ):
+        return "ORG"
+    if len(words) >= 2 and words[0].isupper() and previous_word in {"at", "from", "with"}:
+        return "ORG"
+    if len(words) == 1 and following_word == "joined" and _joined_known_organization(source[end:]):
+        return "PERSON"
     if value in GEOGRAPHIC_NAMES:
         return "LOCATION"
     if words[-1] in ORG_SUFFIXES or value.isupper() or (len(words) == 1 and _has_internal_capital(value)):
         return "ORG"
+    if previous_word in LOCATION_PREPOSITIONS:
+        return "LOCATION"
     if words[0] in LOCATION_PREFIXES or words[-1] in LOCATION_SUFFIXES:
         return "LOCATION"
     if len(words) >= 2 and (
@@ -343,6 +369,33 @@ def _label_name(source: str, start: int, end: int, value: str) -> str | None:
     ):
         return "PERSON"
     return None
+
+
+def _joined_known_organization(tail: str) -> bool:
+    match = re.match(r"\s+joined\s+([A-Z][A-Za-z&.'-]*(?:\s+[A-Z][A-Za-z&.'-]*){0,4})", tail)
+    if match is None:
+        return False
+    candidate = match.group(1).strip(" .")
+    words = candidate.split()
+    return bool(
+        candidate in KNOWN_ORGANIZATIONS
+        or words[-1] in ORG_SUFFIXES
+        or words[0].isupper()
+    )
+
+
+def _known_organization_context(previous_word: str, following_word: str) -> bool:
+    return previous_word in {"at", "by", "for", "from", "with"} or following_word in {
+        "acquired",
+        "announced",
+        "hired",
+        "launched",
+        "opened",
+        "plans",
+        "released",
+        "said",
+        "would",
+    }
 
 
 def _has_internal_capital(value: str) -> bool:

@@ -48,10 +48,13 @@ REMOTE_FIRST_CATEGORIES = {"sentiment", "summarization", "ner"}
 # Only methods with deterministic completeness and format checks may bypass remote-first routing.
 REMOTE_FIRST_LOCAL_METHODS = {
     "sentiment": {
+        "explicit_contrast_mixed",
         "explicit_mixed_lexicon",
         "explicit_negated_lexicon",
         "factual_neutral",
+        "forced_binary_lexicon",
         "mixed_contrast_reason",
+        "strong_single_lexicon",
         "strong_unanimous_lexicon",
     },
     "summarization": {
@@ -69,10 +72,13 @@ REMOTE_FIRST_LOCAL_METHODS = {
 # wording falls through to Fireworks instead of receiving a plausible local guess.
 VERIFIED_LOCAL_METHODS = {
     "sentiment": {
+        "explicit_contrast_mixed": 0.97,
         "explicit_mixed_lexicon": 0.97,
         "explicit_negated_lexicon": 0.95,
         "factual_neutral": 0.92,
+        "forced_binary_lexicon": 0.97,
         "mixed_contrast_reason": 0.99,
+        "strong_single_lexicon": 0.93,
         "strong_unanimous_lexicon": 0.97,
     },
     "summarization": {
@@ -103,6 +109,7 @@ VERIFIED_LOCAL_METHODS = {
         "sum_list_generation": 0.99,
         "count_vowels_generation": 0.99,
         "customers_without_orders_sql_generation": 0.99,
+        "active_customers_sql_generation": 0.99,
         "merge_sorted_generation": 0.99,
         "unique_words_generation": 0.99,
     },

@@ -846,7 +846,7 @@ class LocalSolverTests(unittest.TestCase):
         sentiment_prompt = 'Classify the sentiment: "This is excellent."'
         client.responses[sentiment_prompt] = "positive"
         safe_sentiment = solve_prompt(sentiment_prompt, client=client)
-        self.assertEqual(safe_sentiment.source, "fireworks")
+        self.assertEqual(safe_sentiment.source, "local:strong_single_lexicon")
         self.assertEqual(safe_sentiment.answer, "positive")
 
         ambiguous_sentiment = 'Classify the sentiment: "It might be good, but the result is unclear."'
