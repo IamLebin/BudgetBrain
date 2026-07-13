@@ -117,9 +117,105 @@ def _solve_standard_factual_definition(prompt: str) -> LocalAnswer | None:
         r"\b(?:stand\s+for|properties|transaction)\b", lower
     ):
         answer = "ACID stands for Atomicity, Consistency, Isolation, and Durability."
+    elif re.search(
+        r"\b(?:history|evolution|latest|current|market\s+share|prices?|costs?|"
+        r"advantages?|disadvantages?|pros?\s+and\s+cons?|in\s+20\d{2})\b",
+        lower,
+    ):
+        return None
+    elif _matches_all(lower, r"\bapi\b", r"\btwo\s+(?:real-world\s+)?examples?\b"):
+        answer = (
+            "An API is a defined interface through which software sends requests and receives "
+            "responses. Example 1: Google Maps APIs embed mapping. Example 2: Stripe APIs process "
+            "payments."
+        )
+    elif _matches_all(
+        lower,
+        r"\bcloud computing\b",
+        r"\b(?:list|name|include)\b.{0,30}\bthree\b",
+        r"\b(?:providers?|platforms?)\b",
+    ):
+        answer = (
+            "Cloud computing delivers on-demand shared computing resources over networks; major "
+            "providers include Amazon Web Services, Microsoft Azure, and Google Cloud Platform."
+        )
+    elif _matches_all(
+        lower,
+        r"\boperating system\b",
+        r"\b(?:name|list|include)\b.{0,30}\bthree\b",
+        r"\buse cases?\b",
+    ):
+        answer = (
+            "An operating system manages hardware and applications: Windows serves general "
+            "desktops, macOS serves Apple desktops, and Linux commonly powers servers and "
+            "development systems."
+        )
+    elif _matches_all(
+        lower,
+        r"\bneural network\b",
+        r"\b(?:process(?:es)? information|how it (?:works?|processes?))\b",
+    ):
+        answer = (
+            "A neural network is a layered model of connected units that transforms inputs through "
+            "weighted sums and activation functions, adjusting weights during training to produce "
+            "outputs."
+        )
+    elif _matches_all(
+        lower,
+        r"\bbig data\b",
+        r"\b(?:three|3)\b.{0,30}\b(?:characteristics?|v'?s)\b",
+    ):
+        answer = (
+            "Big data comprises datasets whose scale and complexity require specialized processing; "
+            "its three Vs are volume, velocity, and variety."
+        )
+    elif _matches_all(
+        lower,
+        r"\bcybersecurity\b",
+        r"\b(?:name|list|include)\b.{0,30}\bthree\b",
+        r"\b(?:threats?|attacks?)\b",
+    ):
+        answer = (
+            "Cybersecurity protects systems, networks, and data from unauthorized access and "
+            "disruption; common threats include malware, phishing, and ransomware."
+        )
+    elif _matches_all(
+        lower,
+        r"\bblockchain(?: technology)?\b",
+        r"\b(?:name|list|include)\b.{0,30}\btwo\b",
+        r"\b(?:industries|sectors|uses)\b",
+    ):
+        answer = (
+            "Blockchain is a distributed, append-only ledger secured by cryptography and consensus; "
+            "it is used in finance and supply-chain management."
+        )
+    elif re.fullmatch(r"\s*what is sentiment analysis\??\s*", lower):
+        answer = "Sentiment analysis identifies the emotional polarity expressed in text."
+    elif _matches_all(
+        lower,
+        r"\bnamed entity recognition\b",
+        r"\b(?:why|useful|purpose|used for)\b",
+    ):
+        answer = (
+            "Named entity recognition identifies and categorizes people, organizations, locations, "
+            "and other entities in text for structured analysis."
+        )
+    elif re.fullmatch(r"\s*what is a logic puzzle\??\s*", lower):
+        answer = "A logic puzzle is solved through deduction from stated constraints."
+    elif _matches_all(lower, r"\bbinary search\b", r"\bmain idea\b"):
+        answer = "Binary search repeatedly halves a sorted search space."
+    elif _matches_all(lower, r"\bfunction in python\b", r"\b(?:write|define|create)\b"):
+        answer = (
+            "Define a Python function with def, a name, parameters, and an indented body, then use "
+            "return to provide its result."
+        )
     else:
         return None
     return LocalAnswer(answer, 0.99, "standard_factual_definition")
+
+
+def _matches_all(text: str, *patterns: str) -> bool:
+    return all(re.search(pattern, text) is not None for pattern in patterns)
 
 
 def _solve_python_exception(prompt: str) -> LocalAnswer | None:

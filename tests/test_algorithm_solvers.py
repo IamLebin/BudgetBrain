@@ -12,6 +12,7 @@ from solvers.code_generation_solver import solve_code_generation
 from solvers.factual_solver import solve_factual
 from solvers.logic_solver import solve_logic
 from solvers.math_solver import solve_math
+from solvers.ner_solver import solve_ner
 from solvers.sentiment_solver import solve_sentiment
 from solvers.summarization_solver import solve_summarization
 
@@ -117,6 +118,50 @@ class AlgorithmSolverTests(unittest.TestCase):
                 self.assertEqual(solved.source, "local:standard_factual_definition")
                 for concept in concepts:
                     self.assertIn(concept.lower(), solved.answer.lower())
+
+    def test_standard_technology_definitions_are_complete_and_local(self) -> None:
+        fixture = json.loads(
+            Path("eval/fixtures/practice_factual_10_20260712.json").read_text(encoding="utf-8")
+        )
+        deterministic_ids = {"Q2", "Q4", "Q5", "Q7", "Q8", "Q9", "Q10"}
+        for item in fixture:
+            if item["task_id"] not in deterministic_ids:
+                continue
+            with self.subTest(task_id=item["task_id"]):
+                client = FakeFireworksClient()
+                solved = solve_prompt(item["prompt"], client=client)
+                self.assertEqual(solved.source, "local:standard_factual_definition")
+                self.assertTrue(_answer_matches(solved.answer, item))
+                self.assertEqual(client.calls, [])
+
+        unsupported = (
+            "Define cloud computing and list three providers by market share in 2026.",
+            "Explain the history of neural networks and how they process information.",
+            "Explain blockchain and name two industries with current adoption rates.",
+            "Define cybersecurity and list three threats with their costs.",
+        )
+        for prompt in unsupported:
+            with self.subTest(prompt=prompt):
+                self.assertIsNone(solve_factual(prompt))
+
+    def test_role_based_ner_is_complete_and_local(self) -> None:
+        fixture = json.loads(
+            Path("eval/fixtures/strict_stress_20260712.json").read_text(encoding="utf-8")
+        )
+        ner_items = [item for item in fixture if item["category"] == "ner"]
+        for item in ner_items:
+            with self.subTest(task_id=item["task_id"]):
+                client = FakeFireworksClient()
+                solved = solve_prompt(item["prompt"], client=client)
+                self.assertEqual(solved.source, "local:regex_entities")
+                self.assertTrue(_answer_matches(solved.answer, item))
+                self.assertEqual(client.calls, [])
+
+        ambiguous = solve_ner(
+            "Extract named entities from: Apple CEO spoke with Tim Cook in California."
+        )
+        self.assertIsNotNone(ambiguous)
+        self.assertLess(ambiguous.confidence, 0.9)
 
         debug_prompt = (
             "Fix this Python function so it returns the sum of all numbers, including the final item. "
@@ -260,6 +305,15 @@ class AlgorithmSolverTests(unittest.TestCase):
         cases = {
             "Classify the sentiment: The service is unreliable and frustrating.": "negative",
             "Classify as positive, negative, or neutral: The package arrived on Tuesday as scheduled.": "neutral",
+            "Classify the sentiment: I don't think this is good.": "negative",
+            (
+                "Classify the sentiment as positive, negative, neutral, or mixed: "
+                "The update fixed the crash, but startup is now painfully slow."
+            ): "mixed",
+            (
+                "Classify the sentiment as positive, negative, neutral, or mixed: "
+                "The battery is great, but the screen scratches easily."
+            ): "mixed",
         }
         for prompt, expected in cases.items():
             with self.subTest(prompt=prompt):

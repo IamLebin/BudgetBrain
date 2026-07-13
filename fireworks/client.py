@@ -44,29 +44,28 @@ MAX_TOKENS = {
 
 SYSTEM_PROMPTS = {
     "factual_qa": (
-        "Answer every requested part using standard textbook terms and the requested format. "
-        "Unless the user asks for detail, use one sentence of at most 35 words with no preamble."
+        "Answer every part in the requested format with standard textbook terms. Unless detail is "
+        "requested: one sentence, at most 35 words, no preamble."
     ),
-    "math": "Solve carefully and verify the arithmetic. Follow the requested format and detail level.",
-    "sentiment": "Use only requested labels. Give a reason only when requested and obey format limits.",
+    "math": "Solve and verify the arithmetic. Follow the requested format and detail level.",
+    "sentiment": "Use only requested labels and format. Include a reason only when requested.",
     "summarization": (
-        "Preserve key facts and obey every length, count, and format constraint. Cover every "
-        "explicitly listed capability, benefit, drawback, risk, cause, response, and named actor "
-        "when the requested length allows it; compress wording instead of dropping an enumerated item."
+        "Obey all count, length, and format constraints. Preserve named actors and each listed "
+        "capability, benefit, drawback, risk, cause, and response when possible; compress rather "
+        "than omit."
     ),
     "ner": (
-        "Extract all entities in the requested format using PERSON, ORG, LOCATION, and DATE "
-        "unless labels are provided."
+        "Extract every entity in the requested format. Use supplied labels; otherwise use PERSON, "
+        "ORG, LOCATION, and DATE."
     ),
     "code_debugging": (
-        "Briefly name the bug, then show the smallest runnable fix in a fenced block. Preserve "
-        "the signature and structure; prefer built-ins and give one fix only. Omit the diagnosis "
-        "only if code-only output is explicitly requested."
+        "Briefly name the bug, then give one minimal runnable fix in a fenced block, preserving "
+        "signature and structure. Prefer built-ins. Omit diagnosis for code-only requests."
     ),
-    "logic": "Satisfy every stated constraint, verify the conclusion, and use the requested format.",
+    "logic": "Satisfy every constraint, verify the conclusion, and use the requested format.",
     "code_generation": (
-        "Return only the shortest clear runnable code satisfying the stated requirements. "
-        "Do not add validation or edge-case behavior that was not requested."
+        "Return only minimal clear runnable code satisfying the requirements. Do not add "
+        "unrequested validation or edge-case behavior."
     ),
 }
 
@@ -76,31 +75,28 @@ def _system_prompt(category: str, prompt: str) -> str:
     if category == "factual_qa" and _is_comparison_question(prompt):
         return (
             base
-            + " For comparisons, explicitly state hierarchy or subset relationships and contrast "
-            "mechanism, feature handling, key properties such as volatility and relative speed, "
-            "and uses whenever relevant. Do not omit a comparison dimension."
+            + " For comparisons, state hierarchy or subset relationships, mechanisms, feature "
+            "handling, key properties such as volatility and speed, and uses when relevant."
         )
     if category == "sentiment" and re.search(
         r"\b(?:reason|reasoning|justify|explain|why)\b", prompt, re.I
     ):
         return (
             base
-            + " When a reason is requested, explicitly mention every positive and negative aspect "
-            "from the input instead of grouping or generalizing them; preserve concrete timing, "
-            "quantity, delivery, damage, and resolution details, and identify sarcasm when present."
+            + " Mention every positive and negative detail, including timing, quantity, delivery, "
+            "damage, resolution, and sarcasm."
         )
     if category == "summarization":
         if re.search(r"\bbullet\s+points?\b", prompt, re.I):
             return (
                 base
-                + " Use each requested bullet for a different major theme. When present, cover benefits, "
-                "drawbacks or risks, and responses; do not repeat one theme while omitting another."
+                + " Give each bullet a distinct major theme."
             )
         return base
     if category == "ner":
         return base + ' Return one entity per line as "entity | LABEL" with exact uppercase labels.'
     if category == "code_debugging" and not _code_only_requested(prompt):
-        return base + " Briefly name the bug before the corrected code."
+        return base
     return base
 
 

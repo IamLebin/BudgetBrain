@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import re
 import sys
 
@@ -47,6 +48,8 @@ REMOTE_FIRST_CATEGORIES = {"sentiment", "summarization", "ner"}
 # Only methods with deterministic completeness and format checks may bypass remote-first routing.
 REMOTE_FIRST_LOCAL_METHODS = {
     "sentiment": {
+        "explicit_mixed_lexicon",
+        "explicit_negated_lexicon",
         "factual_neutral",
         "mixed_contrast_reason",
         "strong_unanimous_lexicon",
@@ -66,6 +69,8 @@ REMOTE_FIRST_LOCAL_METHODS = {
 # wording falls through to Fireworks instead of receiving a plausible local guess.
 VERIFIED_LOCAL_METHODS = {
     "sentiment": {
+        "explicit_mixed_lexicon": 0.97,
+        "explicit_negated_lexicon": 0.95,
         "factual_neutral": 0.92,
         "mixed_contrast_reason": 0.99,
         "strong_unanimous_lexicon": 0.97,
@@ -205,8 +210,28 @@ def _can_use_local(prompt: str, category: str, method: str, confidence: float) -
 
 def _format_local_answer(prompt: str, category: str, method: str, answer: str) -> str:
     cleaned = answer.strip()
-    if category == "ner" and re.search(r"\bORGANIZATION\b", prompt, re.I):
-        cleaned = re.sub(r'("label"\s*:\s*")ORG("\s*)', r"\1ORGANIZATION\2", cleaned)
+    if category == "ner":
+        if re.search(r"\bORGANIZATION\b", prompt, re.I):
+            cleaned = re.sub(r'("label"\s*:\s*")ORG("\s*)', r"\1ORGANIZATION\2", cleaned)
+        if re.search(
+            r"\blabel\s+(?:each|them|entities?)\s+as\b|"
+            r"\bPERSON\b.{0,80}\bORGANIZATION\b.{0,80}\bLOCATION\b.{0,80}\bDATE\b",
+            prompt,
+            re.I | re.S,
+        ):
+            try:
+                entities = json.loads(cleaned)
+            except json.JSONDecodeError:
+                pass
+            else:
+                if isinstance(entities, list) and all(
+                    isinstance(item, dict) and isinstance(item.get("text"), str)
+                    and isinstance(item.get("label"), str)
+                    for item in entities
+                ):
+                    cleaned = "\n".join(
+                        f'{item["text"]}: {item["label"]}' for item in entities
+                    )
     if category != "code_debugging" or re.search(
         r"\b(?:only|just)\s+(?:return|output|provide|show)\b.{0,30}\b(?:code|fix)\b|"
         r"\b(?:code|fix)\s+only\b",

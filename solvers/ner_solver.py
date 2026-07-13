@@ -197,8 +197,16 @@ SKIP_CAPITALIZED = {
     "I",
     "Identify",
     "Label",
+    "On",
     "The",
 }
+
+ROLE_ENTITY_PATTERN = re.compile(
+    r"\b(?P<org>(?:[A-Z][A-Za-z&.'-]*|[A-Z]{2,})"
+    r"(?:\s+(?:[A-Z][A-Za-z&.'-]*|[A-Z]{2,})){0,3})\s+"
+    r"(?P<role>CEO|CFO|CTO|Founder)\s+"
+    r"(?P<person>[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)+)\b"
+)
 
 
 def solve_ner(prompt: str) -> LocalAnswer | None:
@@ -208,9 +216,7 @@ def solve_ner(prompt: str) -> LocalAnswer | None:
     entities, unresolved = _extract_entities(text)
     if not entities:
         return None
-    role_words = "|".join(sorted(AMBIGUOUS_ROLE_WORDS, key=len, reverse=True))
-    has_ambiguous_role = bool(re.search(fr"\b(?:{role_words})\b", text))
-    confidence = 0.78 if unresolved or has_ambiguous_role else 0.9
+    confidence = 0.78 if unresolved else 0.9
     return LocalAnswer(json.dumps(entities, ensure_ascii=False), confidence, "regex_entities")
 
 
@@ -241,11 +247,18 @@ def _extract_entities(text: str) -> tuple[list[dict[str, str]], bool]:
     ):
         _add(entities, seen, spans, match.group(0), "DATE", match.span())
     for match in re.finditer(
-        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?(?:\s+\d{1,2})?(?:,?\s+\d{4})\b",
+        r"\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?,?\s+\d{4}\b",
         text,
         flags=re.IGNORECASE,
     ):
         _add(entities, seen, spans, match.group(0), "DATE", match.span())
+    for match in re.finditer(
+        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?(?:\s+\d{1,2})?(?:,?\s+\d{4})\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        if not _overlaps(match.span(), spans):
+            _add(entities, seen, spans, match.group(0), "DATE", match.span())
     for match in re.finditer(r"\b\d{4}-\d{2}-\d{2}\b", text):
         _add(entities, seen, spans, match.group(0), "DATE", match.span())
     date_words = "|".join(sorted(MONTHS | WEEKDAYS, key=len, reverse=True))
@@ -273,6 +286,13 @@ def _extract_entities(text: str) -> tuple[list[dict[str, str]], bool]:
         full_span = match.span()
         _add(entities, seen, spans, match.group(1), "PERSON", full_span)
 
+    resolved_role_spans: list[tuple[int, int]] = []
+    for match in ROLE_ENTITY_PATTERN.finditer(text):
+        _add(entities, seen, spans, match.group("org"), "ORG", match.span("org"))
+        _add(entities, seen, spans, match.group("person"), "PERSON", match.span("person"))
+        spans.append(match.span("role"))
+        resolved_role_spans.append(match.span("role"))
+
     org_suffixes = "|".join(sorted(ORG_SUFFIXES, key=len, reverse=True))
     for match in re.finditer(
         fr"\b(?:[A-Z][A-Za-z&.'-]*\s+)*[A-Z][A-Za-z&.'-]*\s+(?:{org_suffixes})\b",
@@ -297,6 +317,10 @@ def _extract_entities(text: str) -> tuple[list[dict[str, str]], bool]:
             unresolved = True
             continue
         _add(entities, seen, spans, value, label, match.span())
+    role_words = "|".join(sorted(AMBIGUOUS_ROLE_WORDS, key=len, reverse=True))
+    for match in re.finditer(fr"\b(?:{role_words})\b", text):
+        if not _overlaps(match.span(), resolved_role_spans):
+            unresolved = True
     return entities, unresolved
 
 

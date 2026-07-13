@@ -22,6 +22,7 @@ POSITIVE = {
     "fast",
     "flawless",
     "friendly",
+    "fixed",
     "good",
     "great",
     "happy",
@@ -182,6 +183,8 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
                 return None
         else:
             label = "mixed"
+        if label == "mixed" and "mixed" in allowed_labels:
+            return LocalAnswer(label, 0.97, "explicit_mixed_lexicon")
         return LocalAnswer(label, min(0.95, 0.84 + hits * 0.03), "mixed_lexicon")
     if hits >= 2 and _is_short_unambiguous_statement(text):
         label = "positive" if positive_hits else "negative"
