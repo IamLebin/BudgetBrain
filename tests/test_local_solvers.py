@@ -12,6 +12,7 @@ from eval.run_local_eval import FakeFireworksClient
 from fireworks.client import (
     FireworksClient,
     FireworksError,
+    _system_prompt,
     clean_model_answer,
     model_id_for_request,
     normalize_model_id,
@@ -585,6 +586,36 @@ class LocalSolverTests(unittest.TestCase):
         )
         self.assertEqual(client.pick_model("factual_qa"), "minimax-m3")
 
+    def test_fireworks_system_prompts_are_compact_and_keep_accuracy_constraints(self) -> None:
+        comparison = _system_prompt("factual_qa", "Compare RAM and ROM.")
+        sentiment = _system_prompt(
+            "sentiment",
+            "Classify the sentiment and explain why: good but late.",
+        )
+        summary = _system_prompt(
+            "summarization",
+            "Summarize in three bullet points: benefits, risks, and responses.",
+        )
+        debugging = _system_prompt(
+            "code_debugging",
+            "Find and fix the bug in this Python function.",
+        )
+
+        self.assertLessEqual(len(comparison.split()), 45)
+        self.assertLessEqual(len(sentiment.split()), 30)
+        self.assertLessEqual(len(summary.split()), 35)
+        self.assertLessEqual(len(debugging.split()), 25)
+        for required in ("hierarchy", "mechanisms", "properties", "uses"):
+            self.assertIn(required, comparison)
+        for required in ("textbook terms", "one sentence", "35 words", "no preamble"):
+            self.assertIn(required, comparison)
+        for required in ("positive", "negative", "timing", "sarcasm"):
+            self.assertIn(required, sentiment)
+        for required in ("count", "length", "format", "when possible", "distinct major theme"):
+            self.assertIn(required, summary)
+        for required in ("bug", "runnable fix", "signature", "built-ins", "code-only"):
+            self.assertIn(required, debugging)
+
     def test_allowed_models_accepts_json_array(self) -> None:
         self.assertEqual(
             parse_allowed_models('["gemma-4-26b-a4b-it", "kimi-k2p7-code"]'),
@@ -815,7 +846,7 @@ class LocalSolverTests(unittest.TestCase):
         sentiment_prompt = 'Classify the sentiment: "This is excellent."'
         client.responses[sentiment_prompt] = "positive"
         safe_sentiment = solve_prompt(sentiment_prompt, client=client)
-        self.assertEqual(safe_sentiment.source, "fireworks")
+        self.assertEqual(safe_sentiment.source, "local:strong_single_lexicon")
         self.assertEqual(safe_sentiment.answer, "positive")
 
         ambiguous_sentiment = 'Classify the sentiment: "It might be good, but the result is unclear."'
@@ -836,8 +867,10 @@ class LocalSolverTests(unittest.TestCase):
         ambiguous_ner = (
             "Extract all named entities and types from: Apple CEO Tim Cook spoke in California."
         )
-        client.responses[ambiguous_ner] = "Apple ORG; Tim Cook PERSON; California LOCATION"
-        self.assertEqual(solve_prompt(ambiguous_ner, client=client).source, "fireworks")
+        solved_ner = solve_prompt(ambiguous_ner, client=client)
+        self.assertEqual(solved_ner.source, "local:regex_entities")
+        self.assertIn('"text": "Apple"', solved_ner.answer)
+        self.assertIn('"text": "Tim Cook"', solved_ner.answer)
 
         local_math = solve_prompt("What is 7 * (8 + 2)?", client=client)
         self.assertEqual(local_math.source, "local:safe_eval")

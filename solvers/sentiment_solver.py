@@ -22,6 +22,7 @@ POSITIVE = {
     "fast",
     "flawless",
     "friendly",
+    "fixed",
     "good",
     "great",
     "happy",
@@ -97,6 +98,7 @@ NEGATIVE = {
     "terrible",
     "underwhelming",
     "unhappy",
+    "unusable",
     "unreliable",
     "useless",
     "worst",
@@ -169,12 +171,23 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
             return LocalAnswer("neutral", 0.92, "factual_neutral")
         return LocalAnswer("neutral", 0.72, "lexicon")
     if positive_hits and negative_hits:
+        instruction = prompt.split(":", maxsplit=1)[0].lower()
         allowed_labels = set(
             re.findall(
                 r"\b(?:positive|negative|neutral|mixed)\b",
-                prompt.split(":", maxsplit=1)[0].lower(),
+                instruction,
             )
         )
+        if re.search(r"\b(?:favorable|unfavorable|favourable|unfavourable)\b", instruction):
+            margin = positive_hits - negative_hits
+            if margin:
+                label = "positive" if margin > 0 else "negative"
+                return LocalAnswer(
+                    _requested_label_style(label, prompt),
+                    0.97,
+                    "forced_binary_lexicon",
+                )
+            return None
         if allowed_labels and "mixed" not in allowed_labels:
             if {"positive", "negative", "neutral"} <= allowed_labels:
                 label = "neutral"
@@ -182,6 +195,14 @@ def solve_sentiment(prompt: str) -> LocalAnswer | None:
                 return None
         else:
             label = "mixed"
+        if label == "mixed" and "mixed" in allowed_labels:
+            return LocalAnswer(label, 0.97, "explicit_mixed_lexicon")
+        if label == "mixed" and re.search(
+            r"\b(?:but|however|although|yet|despite)\b",
+            text,
+            re.I,
+        ):
+            return LocalAnswer(label, 0.97, "explicit_contrast_mixed")
         return LocalAnswer(label, min(0.95, 0.84 + hits * 0.03), "mixed_lexicon")
     if hits >= 2 and _is_short_unambiguous_statement(text):
         label = "positive" if positive_hits else "negative"
@@ -246,7 +267,8 @@ def _is_short_unambiguous_statement(text: str) -> bool:
         return False
     return not re.search(
         r"\b(?:but|however|although|yet|maybe|perhaps|possibly|somewhat|unclear|"
-        r"apparently|supposedly|seems?|might|could|hardly|barely)\b",
+        r"apparently|supposedly|seems?|might|could|hardly|barely|expected?|expecting|"
+        r"promised?|claimed?|allegedly)\b",
         text,
         re.I,
     )

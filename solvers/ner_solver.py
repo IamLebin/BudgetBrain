@@ -62,6 +62,22 @@ GEOGRAPHIC_NAMES = {
     "United States",
 }
 
+KNOWN_ORGANIZATIONS = {
+    "Amazon",
+    "Apple",
+    "Facebook",
+    "Fireworks",
+    "Google",
+    "IBM",
+    "Meta",
+    "Microsoft",
+    "NASA",
+    "NVIDIA",
+    "OpenAI",
+    "Oracle",
+    "Tesla",
+}
+
 LOCATION_SUFFIXES = {
     "Airport",
     "Bay",
@@ -191,14 +207,23 @@ MONTHS = {
 
 SKIP_CAPITALIZED = {
     "A",
+    "AI",
     "An",
     "Extract",
     "Find",
     "I",
     "Identify",
     "Label",
+    "On",
     "The",
 }
+
+ROLE_ENTITY_PATTERN = re.compile(
+    r"\b(?P<org>(?:[A-Z][A-Za-z&.'-]*|[A-Z]{2,})"
+    r"(?:\s+(?:[A-Z][A-Za-z&.'-]*|[A-Z]{2,})){0,3})\s+"
+    r"(?P<role>CEO|CFO|CTO|Founder)\s+"
+    r"(?P<person>[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)+)\b"
+)
 
 
 def solve_ner(prompt: str) -> LocalAnswer | None:
@@ -208,9 +233,7 @@ def solve_ner(prompt: str) -> LocalAnswer | None:
     entities, unresolved = _extract_entities(text)
     if not entities:
         return None
-    role_words = "|".join(sorted(AMBIGUOUS_ROLE_WORDS, key=len, reverse=True))
-    has_ambiguous_role = bool(re.search(fr"\b(?:{role_words})\b", text))
-    confidence = 0.78 if unresolved or has_ambiguous_role else 0.9
+    confidence = 0.78 if unresolved else 0.9
     return LocalAnswer(json.dumps(entities, ensure_ascii=False), confidence, "regex_entities")
 
 
@@ -241,11 +264,18 @@ def _extract_entities(text: str) -> tuple[list[dict[str, str]], bool]:
     ):
         _add(entities, seen, spans, match.group(0), "DATE", match.span())
     for match in re.finditer(
-        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?(?:\s+\d{1,2})?(?:,?\s+\d{4})\b",
+        r"\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?,?\s+\d{4}\b",
         text,
         flags=re.IGNORECASE,
     ):
         _add(entities, seen, spans, match.group(0), "DATE", match.span())
+    for match in re.finditer(
+        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?(?:\s+\d{1,2})?(?:,?\s+\d{4})\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        if not _overlaps(match.span(), spans):
+            _add(entities, seen, spans, match.group(0), "DATE", match.span())
     for match in re.finditer(r"\b\d{4}-\d{2}-\d{2}\b", text):
         _add(entities, seen, spans, match.group(0), "DATE", match.span())
     date_words = "|".join(sorted(MONTHS | WEEKDAYS, key=len, reverse=True))
@@ -273,6 +303,13 @@ def _extract_entities(text: str) -> tuple[list[dict[str, str]], bool]:
         full_span = match.span()
         _add(entities, seen, spans, match.group(1), "PERSON", full_span)
 
+    resolved_role_spans: list[tuple[int, int]] = []
+    for match in ROLE_ENTITY_PATTERN.finditer(text):
+        _add(entities, seen, spans, match.group("org"), "ORG", match.span("org"))
+        _add(entities, seen, spans, match.group("person"), "PERSON", match.span("person"))
+        spans.append(match.span("role"))
+        resolved_role_spans.append(match.span("role"))
+
     org_suffixes = "|".join(sorted(ORG_SUFFIXES, key=len, reverse=True))
     for match in re.finditer(
         fr"\b(?:[A-Z][A-Za-z&.'-]*\s+)*[A-Z][A-Za-z&.'-]*\s+(?:{org_suffixes})\b",
@@ -297,6 +334,10 @@ def _extract_entities(text: str) -> tuple[list[dict[str, str]], bool]:
             unresolved = True
             continue
         _add(entities, seen, spans, value, label, match.span())
+    role_words = "|".join(sorted(AMBIGUOUS_ROLE_WORDS, key=len, reverse=True))
+    for match in re.finditer(fr"\b(?:{role_words})\b", text):
+        if not _overlaps(match.span(), resolved_role_spans):
+            unresolved = True
     return entities, unresolved
 
 
@@ -306,12 +347,21 @@ def _label_name(source: str, start: int, end: int, value: str) -> str | None:
     previous_word = previous[-1].lower() if previous else ""
     following = re.findall(r"\b[A-Za-z]+\b", source[end:])
     following_word = following[0].lower() if following else ""
-    if previous_word in LOCATION_PREPOSITIONS:
-        return "LOCATION"
+    if value in KNOWN_ORGANIZATIONS and _known_organization_context(
+        previous_word,
+        following_word,
+    ):
+        return "ORG"
+    if len(words) >= 2 and words[0].isupper() and previous_word in {"at", "from", "with"}:
+        return "ORG"
+    if len(words) == 1 and following_word == "joined" and _joined_known_organization(source[end:]):
+        return "PERSON"
     if value in GEOGRAPHIC_NAMES:
         return "LOCATION"
     if words[-1] in ORG_SUFFIXES or value.isupper() or (len(words) == 1 and _has_internal_capital(value)):
         return "ORG"
+    if previous_word in LOCATION_PREPOSITIONS:
+        return "LOCATION"
     if words[0] in LOCATION_PREFIXES or words[-1] in LOCATION_SUFFIXES:
         return "LOCATION"
     if len(words) >= 2 and (
@@ -319,6 +369,33 @@ def _label_name(source: str, start: int, end: int, value: str) -> str | None:
     ):
         return "PERSON"
     return None
+
+
+def _joined_known_organization(tail: str) -> bool:
+    match = re.match(r"\s+joined\s+([A-Z][A-Za-z&.'-]*(?:\s+[A-Z][A-Za-z&.'-]*){0,4})", tail)
+    if match is None:
+        return False
+    candidate = match.group(1).strip(" .")
+    words = candidate.split()
+    return bool(
+        candidate in KNOWN_ORGANIZATIONS
+        or words[-1] in ORG_SUFFIXES
+        or words[0].isupper()
+    )
+
+
+def _known_organization_context(previous_word: str, following_word: str) -> bool:
+    return previous_word in {"at", "by", "for", "from", "with"} or following_word in {
+        "acquired",
+        "announced",
+        "hired",
+        "launched",
+        "opened",
+        "plans",
+        "released",
+        "said",
+        "would",
+    }
 
 
 def _has_internal_capital(value: str) -> bool:

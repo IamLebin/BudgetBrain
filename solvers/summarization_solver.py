@@ -22,7 +22,7 @@ def solve_summarization(prompt: str) -> LocalAnswer | None:
         return None
 
     bullet_request = re.search(
-        r"\b(?:in|into)\s+(?P<count>[1-5]|one|two|three|four|five)\s+"
+        r"\b(?:in|into)\s+(?:exactly\s+)?(?P<count>[1-5]|one|two|three|four|five)\s+"
         r"bullet\s+points?\b",
         prompt,
         re.I,
@@ -42,7 +42,16 @@ def solve_summarization(prompt: str) -> LocalAnswer | None:
         if requested != len(sentences) or not (2 <= requested <= 5):
             return None
         word_counts = [len(re.findall(r"\b[\w'-]+\b", sentence)) for sentence in sentences]
-        if any(count < 3 or count > 20 for count in word_counts) or sum(word_counts) > 50:
+        per_bullet_limit = re.search(
+            r"\beach\s+(?:bullet(?:\s+point)?\s+)?(?:no\s+longer\s+than|"
+            r"no\s+more\s+than|at\s+most)\s+(\d+)\s+words?\b",
+            prompt,
+            re.I,
+        )
+        max_words = int(per_bullet_limit.group(1)) if per_bullet_limit else 20
+        if any(count < 3 or count > max_words for count in word_counts):
+            return None
+        if per_bullet_limit is None and sum(word_counts) > 50:
             return None
         answer = "\n".join(f"- {_bullet_text(sentence)}" for sentence in sentences)
         return LocalAnswer(answer, 0.93, "short_bullet_extraction")
@@ -76,7 +85,10 @@ def _summary_source(prompt: str) -> str | None:
     parts = re.split(r":\s*", prompt, maxsplit=1)
     if len(parts) != 2 or not parts[1].strip():
         return None
-    return parts[1].strip()
+    body = parts[1].strip()
+    if len(body) >= 2 and body[0] == body[-1] and body[0] in {"'", '"'}:
+        body = body[1:-1].strip()
+    return body
 
 
 def _sentences(text: str) -> list[str]:

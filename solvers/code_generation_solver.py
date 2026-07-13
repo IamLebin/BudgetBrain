@@ -12,6 +12,9 @@ def solve_code_generation(prompt: str) -> LocalAnswer | None:
         no_orders = _solve_customers_without_orders_sql(lower)
         if no_orders:
             return _answer(no_orders, "customers_without_orders_sql_generation", python=False)
+        active_customers = _solve_active_customers_sql(lower)
+        if active_customers:
+            return _answer(active_customers, "active_customers_sql_generation", python=False)
         sql = _solve_grouped_average_sql(lower)
         return _answer(sql, "grouped_average_sql_generation", python=False) if sql else None
     if re.search(r"\b(?:javascript|typescript|java|c\+\+|rust)\b", lower):
@@ -209,6 +212,15 @@ def _solve_customers_without_orders_sql(lower: str) -> str | None:
         "    SELECT 1 FROM orders AS o WHERE o.customer_id = c.id\n"
         ");"
     )
+
+
+def _solve_active_customers_sql(lower: str) -> str | None:
+    if not re.search(r"\bactive\s+customers?\b", lower):
+        return None
+    if re.search(r"\b(?:join|orders?|group|average|count|sum|limit|inactive)\b", lower):
+        return None
+    selected = "name" if re.search(r"\b(?:names?|customer_name)\b", lower) else "*"
+    return f"SELECT {selected} FROM customers WHERE active = TRUE;"
 
 
 def _answer(code: str, method: str, *, python: bool = True) -> LocalAnswer:
